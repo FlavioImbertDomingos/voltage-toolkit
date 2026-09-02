@@ -21,7 +21,7 @@ Plus a mock appliance, so all of it runs with `docker compose up` and no Voltage
 
 ---
 
-## The 10-year-old explanation
+## Non-techinical explanation
 
 A bank has a machine that turns card numbers into fake-looking card numbers (a *token*) so
 the real ones never sit in databases. Every payment, every night batch, every customer
