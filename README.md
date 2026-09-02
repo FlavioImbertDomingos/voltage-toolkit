@@ -42,18 +42,8 @@ Prometheus. If anything is slow, wrong or broken, an alert fires before customer
 exist, which formats they offer, which applications (identities) may use them and how they
 log in — and every night it checks the machine still agrees with the rulebook.
 
-```
-                      every 30s: protect(4111…) → token → access(token) == 4111…?
-  ┌──────────────────┐                                     ┌──────────────────┐
-  │ Voltage          │◄── clientPolicy.xml ────────────────│ voltage-exporter │──► /metrics ──► Prometheus ──► alerts
-  │ SecureData       │◄── REST / SOAP protect+access ──────│  (synthetic      │                      │
-  │ (policy, WS API, │◄── TLS handshake (cert expiry) ─────│   probes)        │                   Grafana
-  │  key server)     │                                     └──────────────────┘
-  │                  │◄── voltage_policy_facts ────────────┐
-  └──────────────────┘                                     │  Ansible collection
-                          voltage-config.yml (git) ──diff──┤  voltage_district / voltage_identity /
-                                                           │  voltage_auth_method  +  voltage_policy_audit role
-```
+<img width="968" height="544" alt="image" src="https://github.com/user-attachments/assets/80abded6-3c78-43f4-87e4-25e58b73fad5" />
+
 
 ---
 
