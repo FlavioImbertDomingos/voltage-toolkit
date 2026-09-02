@@ -13,7 +13,7 @@ Two things in one repo:
 
 Plus a mock appliance, so all of it runs with `docker compose up` and no Voltage licence.
 
-<img width="919" height="500" alt="image" src="https://github.com/user-attachments/assets/7bbc2767-f56c-47d3-b7ba-5d4f4a2a9192" />
+<img width="968" height="544" alt="image" src="https://github.com/user-attachments/assets/80abded6-3c78-43f4-87e4-25e58b73fad5" />
 
 
 [![CI](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml)
@@ -41,8 +41,6 @@ Prometheus. If anything is slow, wrong or broken, an alert fires before customer
 **The Ansible collection is the rulebook.** It writes down, in git, which districts should
 exist, which formats they offer, which applications (identities) may use them and how they
 log in — and every night it checks the machine still agrees with the rulebook.
-
-<img width="968" height="544" alt="image" src="https://github.com/user-attachments/assets/80abded6-3c78-43f4-87e4-25e58b73fad5" />
 
 
 ---
