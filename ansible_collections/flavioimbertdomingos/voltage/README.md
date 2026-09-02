@@ -95,4 +95,6 @@ ansible-core ≥ 2.15, Python ≥ 3.8 on the controller (modules run on the cont
 
 ## License
 
-Apache-2.0. Not affiliated with OpenText. "Voltage" and "SecureData" are OpenText trademarks.
+GPL-3.0-or-later (see `COPYING`) — Ansible requires collection modules to be GPLv3+ because they link against
+`ansible.module_utils.basic`. The rest of the repository (exporter, mock, dashboards) is Apache-2.0.
+Not affiliated with OpenText. "Voltage" and "SecureData" are OpenText trademarks.

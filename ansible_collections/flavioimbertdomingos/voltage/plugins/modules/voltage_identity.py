@@ -1,7 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 Flavio Domingos
-# Apache-2.0
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
@@ -114,7 +115,7 @@ def main():
         district=dict(type="str"),
         auth_method=dict(type="str", choices=["SharedSecret", "UsernamePassword", "LDAP", "Certificate"]),
         formats=dict(type="list", elements="str"),
-        secret_ref=dict(type="str"),
+        secret_ref=dict(type="str", no_log=False),
         owner=dict(type="str"),
         description=dict(type="str"),
         tags=dict(type="dict"),

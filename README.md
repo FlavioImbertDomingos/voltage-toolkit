@@ -197,4 +197,5 @@ voltage-toolkit/
 
 ## License
 
-Apache-2.0. Not affiliated with OpenText. "Voltage" and "SecureData" are trademarks of Open Text Corporation.
+Apache-2.0, except the Ansible collection (`ansible_collections/…`), which is GPL-3.0-or-later as Ansible requires
+for modules. Not affiliated with OpenText. "Voltage" and "SecureData" are trademarks of Open Text Corporation.

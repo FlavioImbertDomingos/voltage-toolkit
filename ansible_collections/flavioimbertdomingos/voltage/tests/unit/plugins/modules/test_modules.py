@@ -10,6 +10,7 @@ import yaml
 
 from ...conftest import run_module
 
+
 # --------------------------------------------------------------------- file backend
 def test_identity_file_backend_is_idempotent(state_file):
     args = dict(name="payments@x", district="prod", formats=["CC"], owner="pay",

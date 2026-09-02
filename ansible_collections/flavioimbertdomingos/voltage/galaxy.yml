@@ -8,7 +8,7 @@ description: >-
   Facts, synthetic probes, config-as-code and drift detection for OpenText Voltage SecureData
   (identities, districts, authentication methods, formats), plus a role to deploy voltage-exporter.
 license:
-  - Apache-2.0
+  - GPL-3.0-or-later
 tags:
   - security
   - voltage
