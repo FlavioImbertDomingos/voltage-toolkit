@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  exporter:
+    name: Exporter lint + tests (live mock)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: |
+          pip install ruff
+          pip install -e "./exporter[test]"
+      - run: |
+          ruff check exporter mock-voltage grafana
+          ruff format --check exporter mock-voltage grafana
+      - run: cd exporter && python -m pytest -q
+      - name: policy.py is identical in exporter and collection
+        run: diff <(tail -n +5 exporter/voltage_exporter/policy.py) <(tail -n +7 ansible_collections/flavioimbertdomingos/voltage/plugins/module_utils/policy.py)
+
+  collection:
+    name: Ansible collection (units + sanity + playbooks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ansible-core pytest pyyaml flask cryptography
+      - name: Unit tests (modules run as Ansible runs them, against the mock)
+        run: python -m pytest -q ansible_collections/flavioimbertdomingos/voltage/tests/unit -p no:cacheprovider
+      - name: ansible-test sanity
+        working-directory: ansible_collections/flavioimbertdomingos/voltage
+        run: ansible-test sanity --python 3.12 --requirements --skip-test pylint
+      - name: Playbooks against the mock
+        env:
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}
+          ANSIBLE_LOCALHOST_WARNING: "false"
+          VOLTAGE_SHARED_SECRET: probe-secret
+        run: |
+          (cd mock-voltage && MOCK_TLS_PORT=8443 MOCK_KEY_HOST=localhost:8443 python app.py > /tmp/mock.log 2>&1 &)
+          sleep 4
+          cd /tmp && mkdir -p run && cd run
+          ansible-playbook flavioimbertdomingos.voltage.configure -e voltage_policy_url=https://localhost:8443/policy/clientPolicy.xml -e voltage_config_path=/tmp/run/voltage-config.yml
+          ansible-playbook flavioimbertdomingos.voltage.configure -e voltage_policy_url=https://localhost:8443/policy/clientPolicy.xml -e voltage_config_path=/tmp/run/voltage-config.yml | grep -q "changed=0"
+          sed -i 's#https://voltage:8443/vibekeys/#https://localhost:8443/vibekeys/#' voltage-config.yml
+          ansible-playbook flavioimbertdomingos.voltage.probe -e voltage_policy_url=https://localhost:8443/policy/clientPolicy.xml -e voltage_validate_certs=false
+          ansible-playbook flavioimbertdomingos.voltage.audit -e voltage_audit_config_path=/tmp/run/voltage-config.yml -e voltage_audit_report_dir=/tmp/run/reports -e voltage_audit_validate_certs=false -e voltage_audit_fail_on_drift=true -e voltage_audit_probe=true -e voltage_audit_probe_identity=probe@demo.bank -e voltage_audit_probe_secret=probe-secret
+          curl -s -X POST localhost:8800/mock/scenario/policy-changed
+          if ansible-playbook flavioimbertdomingos.voltage.audit -e voltage_audit_config_path=/tmp/run/voltage-config.yml -e voltage_audit_report_dir=/tmp/run/reports -e voltage_audit_validate_certs=false -e voltage_audit_fail_on_drift=true; then echo "drift not detected"; exit 1; fi
+          grep -q "PHONE" /tmp/run/reports/voltage-audit.md
+
+  prometheus-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check rules /p/alerts/voltage.rules.yml
+          docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check config /p/prometheus.yml
+          docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 test rules /p/alerts/voltage.rules.test.yml
+
+  compose-smoke:
+    name: docker compose smoke test
+    runs-on: ubuntu-latest
+    needs: [exporter]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build
+      - name: Wait for a successful round-trip
+        run: |
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:9743/metrics | grep -q 'voltage_tokenize_success{format="CC",identity="probe@demo.bank",target="demo-prod"} 1.0'; then echo ok; exit 0; fi
+            sleep 3
+          done
+          docker compose logs; exit 1
+      - name: SOAP target, policy, key server, cert metrics present
+        run: |
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q 'voltage_tokenize_success{format="CC",identity="monitor",target="demo-prod-soap"} 1.0'
+          echo "$M" | grep -q 'voltage_policy_up{target="demo-prod"} 1.0'
+          echo "$M" | grep -q 'voltage_keyserver_up{target="demo-prod",url="https://voltage:8443/vibekeys/"} 1.0'
+          echo "$M" | grep -q '^voltage_certificate_expiry_timestamp_seconds'
+      - name: Scenario is reflected
+        run: |
+          curl -sf -X POST http://localhost:8800/mock/scenario/auth-fail
+          sleep 20
+          curl -sf http://localhost:9743/metrics | grep -E 'voltage_tokenize_errors_total\{.*kind="auth"' | grep -qv ' 0.0$'
+      - name: Prometheus target is up
+        run: |
+          sleep 15
+          curl -sf http://localhost:9090/api/v1/targets | grep -q '"health":"up"'
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
+
+  publish-image:
+    runs-on: ubuntu-latest
+    needs: [exporter, collection, prometheus-rules, compose-smoke]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/voltage-exporter
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./exporter
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
