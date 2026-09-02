@@ -1,0 +1,94 @@
+# ------------------------------------------------------------------
+#  voltage-toolkit demo stack
+#
+#      docker compose up -d
+#
+#      Grafana         http://localhost:3000   (admin / admin)
+#      Prometheus      http://localhost:9090/alerts
+#      Alertmanager    http://localhost:9093
+#      Exporter        http://localhost:9743/metrics
+#      Mock appliance  https://localhost:8443/policy/clientPolicy.xml
+#
+#  Break it on purpose:
+#      curl -X POST localhost:8800/mock/scenario/slow
+#      curl -X POST localhost:8800/mock/scenario/errors
+#      curl -X POST localhost:8800/mock/scenario/auth-fail
+#      curl -X POST localhost:8800/mock/scenario/policy-down
+#      curl -X POST localhost:8800/mock/scenario/keyserver-down
+#      curl -X POST localhost:8800/mock/scenario/policy-changed
+#      curl -X POST localhost:8800/mock/scenario/healthy
+# ------------------------------------------------------------------
+
+services:
+
+  # Pretend Voltage SecureData appliance: policy, REST + SOAP Web Services, key server.
+  voltage:
+    build: ./mock-voltage
+    image: voltage-toolkit/mock-voltage:latest
+    container_name: voltage
+    environment:
+      MOCK_SCENARIO: ${MOCK_SCENARIO:-healthy}
+      MOCK_KEY_HOST: voltage:8443
+      MOCK_SHARED_SECRET: ${VOLTAGE_SHARED_SECRET:-probe-secret}
+      MOCK_PASSWORD: ${VOLTAGE_PASSWORD:-changeme}
+      MOCK_TLS_CERT_DAYS: ${MOCK_TLS_CERT_DAYS:-20}   # short on purpose so the cert alert is visible
+    ports:
+      - "8800:8800"
+      - "8443:8443"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8800/mock/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  voltage-exporter:
+    build: ./exporter
+    image: voltage-toolkit/voltage-exporter:latest
+    container_name: voltage-exporter
+    environment:
+      VOLTAGE_EXPORTER_CONFIG: /config/voltage-exporter.yml
+      VOLTAGE_EXPORTER_INTERVAL: ${VOLTAGE_EXPORTER_INTERVAL:-15}
+      VOLTAGE_SHARED_SECRET: ${VOLTAGE_SHARED_SECRET:-probe-secret}
+      VOLTAGE_PASSWORD: ${VOLTAGE_PASSWORD:-changeme}
+    volumes:
+      - ./config/voltage-exporter.demo.yml:/config/voltage-exporter.yml:ro
+    ports:
+      - "9743:9743"
+    depends_on:
+      voltage:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--web.enable-lifecycle"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
+    ports:
+      - "9090:9090"
+    depends_on: [voltage-exporter]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/voltage.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]

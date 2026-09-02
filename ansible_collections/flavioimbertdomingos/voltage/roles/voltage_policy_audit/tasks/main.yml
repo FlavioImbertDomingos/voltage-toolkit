@@ -1,0 +1,67 @@
+---
+# Compare what git says a district should offer (voltage_district) with what the
+# appliance actually serves in clientPolicy.xml. Read-only.
+
+- name: Load the desired-state document
+  ansible.builtin.include_vars:
+    file: "{{ voltage_audit_config_path }}"
+    name: _voltage_desired
+
+- name: Decide which districts to audit
+  ansible.builtin.set_fact:
+    _voltage_audit_targets: >-
+      {{ (voltage_audit_districts | length > 0)
+         | ternary(voltage_audit_districts,
+                   (_voltage_desired.districts | default({})) | dict2items
+                   | selectattr('value.policy_url', 'defined') | map(attribute='key') | list) }}
+
+- name: Nothing to audit?
+  ansible.builtin.fail:
+    msg: "No districts with a policy_url in {{ voltage_audit_config_path }} and voltage_audit_districts is empty."
+  when: _voltage_audit_targets | length == 0
+
+- name: Audit each district
+  ansible.builtin.include_tasks: district.yml
+  loop: "{{ _voltage_audit_targets }}"
+  loop_control:
+    loop_var: _district
+
+- name: Summarise
+  ansible.builtin.set_fact:
+    voltage_audit_summary:
+      districts: "{{ voltage_audit_results | length }}"
+      with_drift: "{{ voltage_audit_results | selectattr('drift', 'equalto', true) | list | length }}"
+      unreachable: "{{ voltage_audit_results | selectattr('reachable', 'equalto', false) | list | length }}"
+      generated_at: "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
+
+- name: Write reports
+  when: voltage_audit_report_dir | length > 0
+  block:
+    - name: Ensure report directory
+      ansible.builtin.file:
+        path: "{{ voltage_audit_report_dir }}"
+        state: directory
+        mode: "0755"
+    - name: JSON report
+      ansible.builtin.copy:
+        content: "{{ {'summary': voltage_audit_summary, 'districts': voltage_audit_results} | to_nice_json }}\n"
+        dest: "{{ voltage_audit_report_dir }}/voltage-audit.json"
+        mode: "0644"
+    - name: Markdown report
+      ansible.builtin.template:
+        src: report.md.j2
+        dest: "{{ voltage_audit_report_dir }}/voltage-audit.md"
+        mode: "0644"
+
+- name: Show summary
+  ansible.builtin.debug:
+    msg: >-
+      Audited {{ voltage_audit_summary.districts }} district(s):
+      {{ voltage_audit_summary.with_drift }} with drift, {{ voltage_audit_summary.unreachable }} unreachable.
+
+- name: Fail on drift
+  ansible.builtin.fail:
+    msg: "Configuration drift detected: {{ voltage_audit_results | selectattr('drift', 'equalto', true) | map(attribute='district') | list }}"
+  when:
+    - voltage_audit_fail_on_drift | bool
+    - (voltage_audit_summary.with_drift | int) > 0 or (voltage_audit_summary.unreachable | int) > 0

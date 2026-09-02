@@ -1,0 +1,12 @@
+.env
+config/voltage-exporter.yml
+reports/
+out/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+tests/output/
+*.retry
+ansible_collections/flavioimbertdomingos/voltage/playbooks/voltage-config.yml

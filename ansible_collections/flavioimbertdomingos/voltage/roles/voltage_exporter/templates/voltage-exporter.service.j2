@@ -1,0 +1,18 @@
+[Unit]
+Description=voltage-exporter (Voltage SecureData synthetic probes for Prometheus)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ voltage_exporter_user }}
+EnvironmentFile={{ voltage_exporter_config_dir }}/env
+ExecStart={{ voltage_exporter_venv }}/bin/voltage-exporter -c {{ voltage_exporter_config_dir }}/voltage-exporter.yml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,47 @@
+---
+# One-off smoke test: can we tokenize and detokenize right now?
+#
+#   ansible-playbook flavioimbertdomingos.voltage.probe \
+#       -e voltage_policy_url=https://voltage-pp-0000.example.com/policy/clientPolicy.xml \
+#       -e voltage_identity=monitor-probe@example.com -e voltage_secret="$VOLTAGE_SHARED_SECRET"
+#
+- name: Voltage SecureData synthetic probe
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    voltage_policy_url: https://voltage:8443/policy/clientPolicy.xml
+    voltage_identity: probe@demo.bank
+    voltage_secret: "{{ lookup('env', 'VOLTAGE_SHARED_SECRET') }}"
+    voltage_validate_certs: true
+    voltage_probes:
+      - {format: CC, sample: "4111111111111111"}
+      - {format: SSN, sample: "123-45-6789"}
+      - {format: CC-ST-64O, sample: "5500000000000004", tokenization: true}
+  tasks:
+    - name: Policy facts
+      flavioimbertdomingos.voltage.voltage_policy_facts:
+        policy_url: "{{ voltage_policy_url }}"
+        validate_certs: "{{ voltage_validate_certs }}"
+
+    - name: Round-trips
+      flavioimbertdomingos.voltage.voltage_probe:
+        policy_url: "{{ voltage_policy_url }}"
+        identity: "{{ voltage_identity }}"
+        secret: "{{ voltage_secret }}"
+        format: "{{ item.format }}"
+        sample: "{{ item.sample }}"
+        tokenization: "{{ item.tokenization | default(false) }}"
+        validate_certs: "{{ voltage_validate_certs }}"
+        max_latency: 2
+      loop: "{{ voltage_probes }}"
+      loop_control:
+        label: "{{ item.format }}"
+      register: voltage_probe_results
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ voltage_policy.district }} (policy {{ voltage_policy.version }}, {{ voltage_policy.format_names | length }} formats):
+          {% for r in voltage_probe_results.results %}{{ r.item.format }}={{ 'ok' if r.ok else 'FAIL' }}
+          ({{ r.protect_seconds | default('?') }}s/{{ r.access_seconds | default('?') }}s) {% endfor %}

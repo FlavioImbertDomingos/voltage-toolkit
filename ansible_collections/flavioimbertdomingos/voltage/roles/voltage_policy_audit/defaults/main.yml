@@ -1,0 +1,24 @@
+---
+# Desired-state document written by voltage_district / voltage_identity / voltage_auth_method
+voltage_audit_config_path: "{{ playbook_dir }}/voltage-config.yml"
+
+# Districts to audit. Default: every district in the desired-state file that has a policy_url.
+voltage_audit_districts: []
+
+# TLS
+voltage_audit_validate_certs: true
+voltage_audit_ca_path: ""
+
+# Where to write the report (JSON + Markdown). Empty = don't write files.
+voltage_audit_report_dir: "{{ playbook_dir }}/reports"
+
+# Fail the play when drift is found
+voltage_audit_fail_on_drift: false
+
+# Optional synthetic round-trip per district (needs voltage_audit_probe_* below)
+voltage_audit_probe: false
+voltage_audit_probe_identity: ""
+voltage_audit_probe_secret: ""
+voltage_audit_probe_format: CC
+voltage_audit_probe_sample: "4111111111111111"
+voltage_audit_probe_api: rest

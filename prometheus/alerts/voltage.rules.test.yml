@@ -1,0 +1,76 @@
+rule_files:
+  - voltage.rules.yml
+
+evaluation_interval: 15s
+
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'voltage_tokenize_success{target="prod", format="CC", identity="probe"}'
+        values: "1 1 0 0 0 0 0 0 0 0"
+      - series: 'voltage_tokenize_roundtrip_ok{target="prod", format="CC"}'
+        values: "1 1 1 1 0"
+      - series: 'voltage_policy_up{target="prod"}'
+        values: "1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VoltageTokenizationFailing
+        exp_alerts: []
+      - eval_time: 2m30s
+        alertname: VoltageTokenizationFailing
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod, format: CC, identity: probe}
+            exp_annotations:
+              summary: "Tokenization broken: CC on prod"
+              description: "protect+access round-trip for format CC (identity probe) has failed for 2 minutes. See voltage_tokenize_errors_total for the kind (auth / http / timeout / connection / mismatch)."
+      - eval_time: 1m
+        alertname: VoltageRoundTripMismatch
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod, format: CC}
+            exp_annotations:
+              summary: "DATA INTEGRITY: access(protect(x)) != x on prod (CC)"
+              description: "Detokenizing returned a different value than was tokenized. Stop and investigate key/district configuration before anything writes tokens to a database."
+
+  - interval: 15s
+    input_series:
+      - series: 'voltage_certificate_expiry_timestamp_seconds{target="prod", host="pp:443", subject="CN=pp"}'
+        values: "432000x8"
+      - series: 'voltage_certificate_expiry_timestamp_seconds{target="prod", host="ks:443", subject="CN=ks"}'
+        values: "1728000x8"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VoltageCertificateExpiringCritical
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod, host: "pp:443", subject: "CN=pp"}
+            exp_annotations:
+              summary: "pp:443 certificate expires in 5.0 days"
+              description: "Subject CN=pp (prod). When it expires, every client's TLS validation fails and tokenization stops."
+      - eval_time: 1m
+        alertname: VoltageCertificateExpiringSoon
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod, host: "ks:443", subject: "CN=ks"}
+            exp_annotations:
+              summary: "ks:443 certificate expires in 20 days"
+              description: "Subject CN=ks (prod). Every SecureData client validates this certificate."
+
+  - interval: 15s
+    input_series:
+      - series: 'voltage_policy_changes_total{target="prod"}'
+        values: "0 0 1 1 1"
+      - series: 'voltage_policy_up{target="prod"}'
+        values: "1 0 0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VoltagePolicyChanged
+        exp_alerts:
+          - exp_labels: {severity: info, target: prod}
+            exp_annotations:
+              summary: "clientPolicy.xml changed on prod"
+              description: "Formats, key servers or auth methods changed. Expected after a change window; otherwise investigate (PCI DSS 12.3.3 / change control)."
+      - eval_time: 2m30s
+        alertname: VoltagePolicyUnreachable
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod}
+            exp_annotations:
+              summary: "clientPolicy.xml unreachable on prod"
+              description: "Every SecureData client downloads the policy at startup. New app instances, pods and batch jobs cannot start tokenizing until this is fixed."

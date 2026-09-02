@@ -1,0 +1,66 @@
+---
+# Declare the Voltage SecureData configuration as code.
+# Writes voltage-config.yml next to this playbook (file backend) -- commit it to git.
+#
+#   ansible-playbook flavioimbertdomingos.voltage.configure -e voltage_policy_url=https://voltage-pp-0000.example.com/policy/clientPolicy.xml
+#
+- name: Voltage SecureData desired state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    voltage_config_path: "{{ playbook_dir }}/voltage-config.yml"
+    voltage_policy_url: https://voltage:8443/policy/clientPolicy.xml
+    voltage_backend: {type: file, path: "{{ voltage_config_path }}"}
+  tasks:
+    - name: District prod
+      flavioimbertdomingos.voltage.voltage_district:
+        name: prod
+        policy_url: "{{ voltage_policy_url }}"
+        formats:
+          - CC
+          - SSN
+          - AlphaNumeric
+          - UpperCaseAlphaNumeric
+          - US7ASCII-PRINTABLE
+          - ORA-DATE
+          - {name: CC-ST-64O, kind: tokenization}
+        auth_methods: [SharedSecret, UsernamePassword, LDAP]
+        key_servers: ["https://voltage:8443/vibekeys/"]
+        owner: crypto-services
+        backend: "{{ voltage_backend }}"
+
+    - name: Auth methods
+      flavioimbertdomingos.voltage.voltage_auth_method:
+        name: "{{ item.name }}"
+        district: prod
+        type: "{{ item.type }}"
+        settings: "{{ item.settings | default({}) }}"
+        secret_ref: "{{ item.secret_ref | default(omit) }}"
+        backend: "{{ voltage_backend }}"
+      loop:
+        - {name: SharedSecret, type: shared_secret, settings: {rotation_days: 90, min_length: 32}}
+        - {name: LDAP, type: ldap, settings: {ldap_url: "ldaps://ldap.demo.bank:636", base_dn: "ou=apps,dc=demo,dc=bank"},
+           secret_ref: "vault:secret/voltage/prod/ldap-bind"}
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Identities
+      flavioimbertdomingos.voltage.voltage_identity:
+        name: "{{ item.name }}"
+        district: prod
+        auth_method: "{{ item.auth_method }}"
+        formats: "{{ item.formats }}"
+        secret_ref: "{{ item.secret_ref }}"
+        owner: "{{ item.owner }}"
+        tags: "{{ item.tags | default({}) }}"
+        backend: "{{ voltage_backend }}"
+      loop:
+        - {name: payments@demo.bank, auth_method: SharedSecret, formats: [CC, CC-ST-64O],
+           secret_ref: "vault:secret/voltage/prod/payments", owner: payments-platform, tags: {pci: "true"}}
+        - {name: crm@demo.bank, auth_method: SharedSecret, formats: [SSN, AlphaNumeric],
+           secret_ref: "vault:secret/voltage/prod/crm", owner: crm-team}
+        - {name: probe@demo.bank, auth_method: SharedSecret, formats: [CC, SSN, AlphaNumeric, CC-ST-64O],
+           secret_ref: "vault:secret/voltage/prod/probe", owner: sre, tags: {purpose: monitoring}}
+      loop_control:
+        label: "{{ item.name }}"

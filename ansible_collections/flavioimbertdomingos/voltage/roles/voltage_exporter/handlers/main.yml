@@ -1,0 +1,15 @@
+---
+- name: Restart voltage-exporter
+  ansible.builtin.command:
+    cmd: docker restart {{ voltage_exporter_container_name | quote }}
+  when: voltage_exporter_runtime == 'docker'
+  failed_when: false
+  changed_when: true
+  listen: Restart voltage-exporter
+
+- name: Restart voltage-exporter service
+  ansible.builtin.systemd:
+    name: voltage-exporter
+    state: restarted
+  when: voltage_exporter_runtime == 'pip'
+  listen: Restart voltage-exporter

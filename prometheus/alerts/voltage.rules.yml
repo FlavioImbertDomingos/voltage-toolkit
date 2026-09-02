@@ -1,0 +1,133 @@
+# Alerts for Voltage SecureData, fed by voltage-exporter's synthetic probes.
+#
+# The probes answer one question a dashboard of appliance CPU never can:
+# "can an application tokenize a card number right now, and how long does it take?"
+
+groups:
+  - name: voltage-recording
+    interval: 15s
+    rules:
+      - record: voltage:tokenize_error_ratio_10m
+        expr: |
+          sum by (target, format) (rate(voltage_tokenize_probes_total{result="failure"}[10m]))
+            /
+          sum by (target, format) (rate(voltage_tokenize_probes_total[10m]))
+      - record: voltage:protect_p95_seconds_10m
+        expr: histogram_quantile(0.95, sum by (target, format, le) (rate(voltage_protect_seconds_bucket[10m])))
+      - record: voltage:access_p95_seconds_10m
+        expr: histogram_quantile(0.95, sum by (target, format, le) (rate(voltage_access_seconds_bucket[10m])))
+      - record: voltage:certificate_days_until_expiry
+        expr: (voltage_certificate_expiry_timestamp_seconds - time()) / 86400
+
+  - name: voltage-availability
+    rules:
+      - alert: VoltageExporterDown
+        expr: up{job="voltage-exporter"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "voltage-exporter is not being scraped"
+          description: "No Voltage probes are running. Check the exporter container/service."
+
+      - alert: VoltageProbesStale
+        expr: time() - voltage_probe_last_run_timestamp_seconds > 300
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Probes for {{ $labels.target }} have not completed in 5 minutes"
+          description: "The probe loop is stuck or every call is timing out. Check exporter logs."
+
+      - alert: VoltagePolicyUnreachable
+        expr: voltage_policy_up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "clientPolicy.xml unreachable on {{ $labels.target }}"
+          description: "Every SecureData client downloads the policy at startup. New app instances, pods and batch jobs cannot start tokenizing until this is fixed."
+
+      - alert: VoltageKeyServerDown
+        expr: voltage_keyserver_up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Key server {{ $labels.url }} down ({{ $labels.target }})"
+          description: "Clients with cached keys keep working; anything needing a new key (new identity, key rotation, cold start) fails."
+
+  - name: voltage-tokenization
+    rules:
+      - alert: VoltageTokenizationFailing
+        expr: voltage_tokenize_success == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Tokenization broken: {{ $labels.format }} on {{ $labels.target }}"
+          description: "protect+access round-trip for format {{ $labels.format }} (identity {{ $labels.identity }}) has failed for 2 minutes. See voltage_tokenize_errors_total for the kind (auth / http / timeout / connection / mismatch)."
+
+      - alert: VoltageAuthFailures
+        expr: increase(voltage_tokenize_errors_total{kind="auth"}[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Authentication failures on {{ $labels.target }} ({{ $labels.format }})"
+          description: "The probe identity's shared secret / password is being rejected. Was a credential rotated? Was LDAP touched?"
+
+      - alert: VoltageRoundTripMismatch
+        expr: voltage_tokenize_roundtrip_ok == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "DATA INTEGRITY: access(protect(x)) != x on {{ $labels.target }} ({{ $labels.format }})"
+          description: "Detokenizing returned a different value than was tokenized. Stop and investigate key/district configuration before anything writes tokens to a database."
+
+      - alert: VoltageErrorRateHigh
+        expr: voltage:tokenize_error_ratio_10m > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.target }} {{ $labels.format }}: {{ $value | humanizePercentage }} of probes failing"
+          description: "Intermittent failures over 10 minutes. Applications are seeing the same."
+
+      - alert: VoltageLatencyHigh
+        expr: voltage:protect_p95_seconds_10m > 0.5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.target }} {{ $labels.format }}: p95 protect latency {{ $value | humanizeDuration }}"
+          description: "Tokenization is slow. Check appliance load, key server, network path, and whether a key rotation is in progress."
+
+      - alert: VoltageFormatNotPreserved
+        expr: voltage_tokenize_format_preserved == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.format }} on {{ $labels.target }} returned a token with a different shape"
+          description: "FPE must keep length and character classes. A different shape breaks downstream schema validation."
+
+  - name: voltage-configuration
+    rules:
+      - alert: VoltagePolicyChanged
+        expr: increase(voltage_policy_changes_total[30m]) > 0
+        labels: {severity: info}
+        annotations:
+          summary: "clientPolicy.xml changed on {{ $labels.target }}"
+          description: "Formats, key servers or auth methods changed. Expected after a change window; otherwise investigate (PCI DSS 12.3.3 / change control)."
+
+      - alert: VoltageCertificateExpiringSoon
+        expr: voltage:certificate_days_until_expiry < 30 and voltage:certificate_days_until_expiry >= 7
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host }} certificate expires in {{ $value | printf \"%.0f\" }} days"
+          description: "Subject {{ $labels.subject }} ({{ $labels.target }}). Every SecureData client validates this certificate."
+
+      - alert: VoltageCertificateExpiringCritical
+        expr: voltage:certificate_days_until_expiry < 7
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host }} certificate expires in {{ $value | printf \"%.1f\" }} days"
+          description: "Subject {{ $labels.subject }} ({{ $labels.target }}). When it expires, every client's TLS validation fails and tokenization stops."
+
+      - alert: VoltageTlsHandshakeFailing
+        expr: voltage_tls_up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Cannot complete a TLS handshake with {{ $labels.host }} ({{ $labels.target }})"
+          description: "Host down, port filtered, or a certificate/cipher problem."

@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: Flavio Domingos
+  description: Deploy voltage-exporter (Prometheus synthetic probes for Voltage SecureData) as a container or a systemd service
+  license: Apache-2.0
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["8", "9"]
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: Debian
+      versions: [bookworm]
+  galaxy_tags: [voltage, securedata, prometheus, exporter, monitoring]
+dependencies: []

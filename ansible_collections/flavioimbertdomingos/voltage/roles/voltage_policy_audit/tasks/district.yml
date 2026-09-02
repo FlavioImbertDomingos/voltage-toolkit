@@ -1,0 +1,72 @@
+---
+- name: "{{ _district }}: desired state"
+  ansible.builtin.set_fact:
+    _want: "{{ _voltage_desired.districts[_district] | default({}) }}"
+    _want_identities: >-
+      {{ (_voltage_desired.identities | default({})) | dict2items
+         | selectattr('value.district', 'defined') | selectattr('value.district', 'equalto', _district) | list }}
+
+- name: "{{ _district }}: fetch live policy"
+  flavioimbertdomingos.voltage.voltage_policy_facts:
+    policy_url: "{{ _want.policy_url }}"
+    validate_certs: "{{ voltage_audit_validate_certs }}"
+    ca_path: "{{ voltage_audit_ca_path | default(omit, true) }}"
+  register: _live
+  ignore_errors: true
+
+- name: "{{ _district }}: compare"
+  vars:
+    _want_formats: "{{ (_want.formats | default([])) | map(attribute='name') | list }}"
+    _live_formats: "{{ _live.policy.format_names | default([]) }}"
+    _want_auth: "{{ _want.auth_methods | default([]) }}"
+    _live_auth: "{{ _live.policy.auth_methods | default([]) }}"
+    _want_ks: "{{ _want.key_servers | default([]) }}"
+    _live_ks: "{{ _live.policy.key_servers | default([]) }}"
+    _missing_formats: "{{ _want_formats | difference(_live_formats) }}"
+    _extra_formats: "{{ _live_formats | difference(_want_formats) }}"
+    _missing_auth: "{{ _want_auth | difference(_live_auth) }}"
+    _extra_auth: "{{ _live_auth | difference(_want_auth) }}"
+    _missing_ks: "{{ _want_ks | difference(_live_ks) }}"
+    _extra_ks: "{{ _live_ks | difference(_want_ks) }}"
+    _identity_formats_unknown: >-
+      {{ _want_identities | map(attribute='value.formats') | select('defined') | flatten | unique
+         | difference(_live_formats) }}
+  ansible.builtin.set_fact:
+    _result:
+      district: "{{ _district }}"
+      policy_url: "{{ _want.policy_url }}"
+      reachable: "{{ not (_live.failed | default(false)) }}"
+      error: "{{ _live.msg | default('') }}"
+      live_version: "{{ _live.policy.version | default('') }}"
+      live_sha256: "{{ _live.policy.sha256 | default('') }}"
+      formats: {missing: "{{ _missing_formats }}", unexpected: "{{ _extra_formats }}"}
+      auth_methods: {missing: "{{ _missing_auth }}", unexpected: "{{ _extra_auth }}"}
+      key_servers: {missing: "{{ _missing_ks }}", unexpected: "{{ _extra_ks }}"}
+      identities_declared: "{{ _want_identities | map(attribute='key') | list }}"
+      identity_formats_not_offered: "{{ _identity_formats_unknown }}"
+      drift: >-
+        {{ (_live.failed | default(false)) or
+           (_missing_formats | length + _extra_formats | length + _missing_auth | length + _extra_auth | length
+            + _missing_ks | length + _extra_ks | length + _identity_formats_unknown | length) > 0 }}
+
+- name: "{{ _district }}: synthetic round-trip"
+  flavioimbertdomingos.voltage.voltage_probe:
+    policy_url: "{{ _want.policy_url }}"
+    identity: "{{ voltage_audit_probe_identity }}"
+    secret: "{{ voltage_audit_probe_secret }}"
+    format: "{{ voltage_audit_probe_format }}"
+    sample: "{{ voltage_audit_probe_sample }}"
+    api: "{{ voltage_audit_probe_api }}"
+    validate_certs: "{{ voltage_audit_validate_certs }}"
+    ca_path: "{{ voltage_audit_ca_path | default(omit, true) }}"
+    fail_on_error: false
+  register: _probe
+  when: voltage_audit_probe | bool and voltage_audit_probe_identity | length > 0
+
+- name: "{{ _district }}: record"
+  ansible.builtin.set_fact:
+    voltage_audit_results: >-
+      {{ (voltage_audit_results | default([])) +
+         [ _result | combine({'probe': (_probe | default({})) | dict2items
+                                       | rejectattr('key', 'in', ['changed', 'invocation', 'failed', 'warnings', 'skipped', 'skip_reason', 'false_condition'])
+                                       | items2dict}) ] }}

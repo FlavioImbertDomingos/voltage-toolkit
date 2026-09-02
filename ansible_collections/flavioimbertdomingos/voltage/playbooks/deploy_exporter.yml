@@ -1,0 +1,23 @@
+---
+# Deploy voltage-exporter to monitoring hosts.
+#
+#   ansible-playbook flavioimbertdomingos.voltage.deploy_exporter -i inventory -l monitoring
+#
+- name: Deploy voltage-exporter
+  hosts: "{{ voltage_exporter_hosts | default('monitoring') }}"
+  become: true
+  vars:
+    voltage_exporter_runtime: docker
+    voltage_exporter_env:
+      VOLTAGE_SHARED_SECRET_PROD: "{{ vault_voltage_probe_secret | default(lookup('env', 'VOLTAGE_SHARED_SECRET')) }}"
+    voltage_exporter_targets:
+      - name: prod
+        policy_url: https://voltage-pp-0000.example.com/policy/clientPolicy.xml
+        identity: monitor-probe@example.com
+        auth: {method: shared_secret, secret_env: VOLTAGE_SHARED_SECRET_PROD}
+        ca_cert: /config/corp-ca.pem
+        probes:
+          - {format: CC, sample: "4111111111111111"}
+          - {format: CC-ST-64O, sample: "4111111111111111", tokenization: true}
+  roles:
+    - role: flavioimbertdomingos.voltage.voltage_exporter

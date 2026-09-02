@@ -1,0 +1,25 @@
+# Voltage SecureData configuration audit
+
+Generated {{ voltage_audit_summary.generated_at }} from `{{ voltage_audit_config_path }}`.
+{{ voltage_audit_summary.districts }} district(s): **{{ voltage_audit_summary.with_drift }} with drift**, {{ voltage_audit_summary.unreachable }} unreachable.
+
+{% for d in voltage_audit_results %}
+## District `{{ d.district }}` — {{ 'DRIFT' if d.drift else 'in sync' }}
+
+- Policy: `{{ d.policy_url }}`{% if d.reachable %} (version {{ d.live_version }}, sha256 `{{ d.live_sha256[:12] }}`){% else %} — **UNREACHABLE**: {{ d.error }}{% endif %}
+
+- Formats missing from live policy: {{ d.formats.missing | join(', ') or '—' }}
+- Formats live but not declared: {{ d.formats.unexpected | join(', ') or '—' }}
+- Auth methods missing: {{ d.auth_methods.missing | join(', ') or '—' }}
+- Auth methods not declared: {{ d.auth_methods.unexpected | join(', ') or '—' }}
+- Key servers missing: {{ d.key_servers.missing | join(', ') or '—' }}
+- Key servers not declared: {{ d.key_servers.unexpected | join(', ') or '—' }}
+- Identities declared for this district: {{ d.identities_declared | join(', ') or '—' }}
+- Identity formats the district does not offer: {{ d.identity_formats_not_offered | join(', ') or '—' }}
+{% if d.probe and d.probe.ok is defined %}
+- Synthetic round-trip: {{ 'OK' if d.probe.ok else 'FAILED — ' ~ d.probe.error | default('') }}{% if d.probe.protect_seconds is defined %} (protect {{ d.probe.protect_seconds }}s, access {{ d.probe.access_seconds | default('?') }}s){% endif %}
+
+{% endif %}
+{% endfor %}
+
+_Identities are not visible in `clientPolicy.xml`; they are reported as declared and checked against the formats the district offers._

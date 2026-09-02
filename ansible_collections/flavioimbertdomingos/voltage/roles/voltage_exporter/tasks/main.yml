@@ -1,0 +1,44 @@
+---
+- name: Validate
+  ansible.builtin.assert:
+    that:
+      - voltage_exporter_targets | length > 0
+      - voltage_exporter_runtime in ['docker', 'pip']
+    fail_msg: "voltage_exporter_targets must list at least one target; runtime must be docker or pip"
+
+- name: Config directory
+  ansible.builtin.file:
+    path: "{{ voltage_exporter_config_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: CA bundle
+  ansible.builtin.copy:
+    src: "{{ voltage_exporter_ca_cert_src }}"
+    dest: "{{ voltage_exporter_config_dir }}/corp-ca.pem"
+    mode: "0644"
+  when: voltage_exporter_ca_cert_src | length > 0
+  notify: Restart voltage-exporter
+
+- name: Exporter config
+  ansible.builtin.template:
+    src: voltage-exporter.yml.j2
+    dest: "{{ voltage_exporter_config_dir }}/voltage-exporter.yml"
+    mode: "0640"
+  notify: Restart voltage-exporter
+
+- name: Secrets env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ voltage_exporter_config_dir }}/env"
+    mode: "0600"
+  no_log: true
+  notify: Restart voltage-exporter
+
+- name: Docker runtime
+  ansible.builtin.include_tasks: docker.yml
+  when: voltage_exporter_runtime == 'docker'
+
+- name: Pip runtime
+  ansible.builtin.include_tasks: pip.yml
+  when: voltage_exporter_runtime == 'pip'

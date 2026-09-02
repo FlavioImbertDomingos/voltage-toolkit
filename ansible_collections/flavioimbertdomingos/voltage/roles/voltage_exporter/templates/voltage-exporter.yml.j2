@@ -1,0 +1,8 @@
+# Managed by flavioimbertdomingos.voltage.voltage_exporter -- do not edit by hand
+exporter:
+  port: 9743
+  interval_seconds: {{ voltage_exporter_interval_seconds }}
+  log_level: {{ voltage_exporter_log_level }}
+
+targets:
+{{ voltage_exporter_targets | to_nice_yaml(indent=2) | indent(2, true) }}

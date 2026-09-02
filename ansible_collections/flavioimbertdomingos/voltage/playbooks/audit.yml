@@ -1,0 +1,14 @@
+---
+# Compare voltage-config.yml (git) with the live appliance policy. Read-only.
+#
+#   ansible-playbook flavioimbertdomingos.voltage.audit \
+#       -e voltage_audit_validate_certs=false \
+#       -e voltage_audit_probe=true -e voltage_audit_probe_identity=probe@demo.bank \
+#       -e voltage_audit_probe_secret="$VOLTAGE_SHARED_SECRET"
+#
+- name: Voltage SecureData configuration audit
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  roles:
+    - role: flavioimbertdomingos.voltage.voltage_policy_audit

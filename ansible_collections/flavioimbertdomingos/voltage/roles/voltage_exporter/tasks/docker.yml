@@ -1,0 +1,26 @@
+---
+# Uses the docker CLI directly so the role has no collection dependency.
+- name: Pull image
+  ansible.builtin.command:
+    cmd: docker pull {{ voltage_exporter_image | quote }}
+  register: _pull
+  changed_when: "'Downloaded newer image' in _pull.stdout"
+
+- name: Inspect running container
+  ansible.builtin.command:
+    cmd: docker inspect --format '{{ "{{" }}.Config.Image{{ "}}" }} {{ "{{" }}.State.Running{{ "}}" }}' {{ voltage_exporter_container_name | quote }}
+  register: _inspect
+  changed_when: false
+  failed_when: false
+
+- name: Run container
+  ansible.builtin.shell: |
+    docker rm -f {{ voltage_exporter_container_name | quote }} >/dev/null 2>&1 || true
+    docker run -d --name {{ voltage_exporter_container_name | quote }} --restart unless-stopped \
+      -p {{ voltage_exporter_port }}:9743 \
+      --env-file {{ voltage_exporter_config_dir }}/env \
+      -e VOLTAGE_EXPORTER_CONFIG=/config/voltage-exporter.yml \
+      -v {{ voltage_exporter_config_dir }}:/config:ro \
+      {{ voltage_exporter_image | quote }}
+  when: _inspect.rc != 0 or _inspect.stdout != voltage_exporter_image ~ ' true'
+  changed_when: true

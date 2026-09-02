@@ -1,0 +1,33 @@
+# voltage-exporter configuration -- copy to config/voltage-exporter.yml.
+# Secrets come from env vars (`secret_env`) or files (`secret_file`), never inline.
+
+exporter:
+  port: 9743
+  interval_seconds: 30       # every probe runs this often; each tokenize probe = 2 WS calls
+
+targets:
+  - name: prod
+    policy_url: https://voltage-pp-0000.example.com/policy/clientPolicy.xml
+    ws_url: https://voltage-pp-0000.example.com      # host serving /vibesimple/...
+    api: rest                                        # rest | soap
+    identity: monitor-probe@example.com              # a dedicated, low-privilege probe identity
+    auth:
+      method: shared_secret                          # shared_secret | password
+      secret_env: VOLTAGE_SHARED_SECRET_PROD
+    ca_cert: /config/corp-ca.pem                     # or verify_tls: true/false
+    timeout_seconds: 10
+    probes:
+      # Use SYNTHETIC samples only (test PANs etc.). Never real data.
+      - {format: CC,  sample: "4111111111111111"}
+      - {format: SSN, sample: "123-45-6789"}
+      - {format: CC-ST-64O, sample: "4111111111111111", tokenization: true}
+    extra_tls_hosts:
+      - voltage-ks-0000.example.com:443
+      - voltage-mgmt.example.com:8443
+    labels: {site: phx-dc1}
+
+  # - name: dr
+  #   policy_url: https://voltage-pp-0001.example.com/policy/clientPolicy.xml
+  #   identity: monitor-probe@example.com
+  #   auth: {method: shared_secret, secret_env: VOLTAGE_SHARED_SECRET_DR}
+  #   probes: [{format: CC, sample: "4111111111111111"}]

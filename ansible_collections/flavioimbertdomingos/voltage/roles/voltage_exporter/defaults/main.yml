@@ -1,0 +1,35 @@
+---
+# How to run it: "docker" (container) or "pip" (venv + systemd unit)
+voltage_exporter_runtime: docker
+
+# ---- docker
+voltage_exporter_image: ghcr.io/flavioimbertdomingos/voltage-exporter:latest
+voltage_exporter_container_name: voltage-exporter
+
+# ---- pip
+voltage_exporter_pip_spec: "git+https://github.com/FlavioImbertDomingos/voltage-toolkit.git#subdirectory=exporter"
+voltage_exporter_venv: /opt/voltage-exporter
+voltage_exporter_user: voltage-exporter
+
+# ---- common
+voltage_exporter_port: 9743
+voltage_exporter_interval_seconds: 30
+voltage_exporter_config_dir: /etc/voltage-exporter
+voltage_exporter_log_level: INFO
+
+# Secrets: the exporter reads them from env vars named in the config (secret_env).
+# Provide them here from a vault; they are written to an env file with mode 0600.
+voltage_exporter_env: {}
+#   VOLTAGE_SHARED_SECRET_PROD: "{{ vault_voltage_probe_secret }}"
+
+# Targets, exactly as in config/voltage-exporter.example.yml
+voltage_exporter_targets: []
+#   - name: prod
+#     policy_url: https://voltage-pp-0000.example.com/policy/clientPolicy.xml
+#     identity: monitor-probe@example.com
+#     auth: {method: shared_secret, secret_env: VOLTAGE_SHARED_SECRET_PROD}
+#     ca_cert: /etc/voltage-exporter/corp-ca.pem
+#     probes: [{format: CC, sample: "4111111111111111"}]
+
+# Optional CA bundle to copy into the config dir
+voltage_exporter_ca_cert_src: ""

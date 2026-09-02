@@ -1,0 +1,8 @@
+requires_ansible: ">=2.15.0"
+action_groups:
+  voltage:
+    - voltage_policy_facts
+    - voltage_probe
+    - voltage_identity
+    - voltage_district
+    - voltage_auth_method

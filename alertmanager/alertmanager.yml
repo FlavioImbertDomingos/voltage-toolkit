@@ -1,0 +1,40 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ["alertname", "target"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Data-integrity and outage alerts page immediately.
+    - matchers: ['alertname =~ "VoltageRoundTripMismatch|VoltageTokenizationFailing|VoltagePolicyUnreachable"']
+      receiver: pager
+      group_wait: 0s
+      repeat_interval: 30m
+    - matchers: ['severity = "critical"']
+      receiver: pager
+
+receivers:
+  - name: default
+  - name: pager
+    # slack_configs:
+    #   - api_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+    #     channel: "#tokenization-alerts"
+    #     title: '{{ .CommonAnnotations.summary }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ "\n" }}{{ end }}'
+    # pagerduty_configs:
+    #   - routing_key: <key>
+
+inhibit_rules:
+  # If the policy server is down, every tokenize probe fails too -- one page, not six.
+  - source_matchers: ['alertname = "VoltagePolicyUnreachable"']
+    target_matchers: ['alertname =~ "VoltageTokenizationFailing|VoltageErrorRateHigh|VoltageKeyServerDown"']
+    equal: ["target"]
+  - source_matchers: ['alertname = "VoltageTokenizationFailing"']
+    target_matchers: ['alertname =~ "VoltageErrorRateHigh|VoltageLatencyHigh|VoltageAuthFailures"']
+    equal: ["target", "format"]
+  - source_matchers: ['alertname = "VoltageCertificateExpiringCritical"']
+    target_matchers: ['alertname = "VoltageCertificateExpiringSoon"']
+    equal: ["target", "host"]

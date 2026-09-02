@@ -1,0 +1,25 @@
+namespace: flavioimbertdomingos
+name: voltage
+version: 0.1.0
+readme: README.md
+authors:
+  - Flavio Domingos
+description: >-
+  Facts, synthetic probes, config-as-code and drift detection for OpenText Voltage SecureData
+  (identities, districts, authentication methods, formats), plus a role to deploy voltage-exporter.
+license:
+  - Apache-2.0
+tags:
+  - security
+  - voltage
+  - securedata
+  - tokenization
+  - pci
+  - monitoring
+repository: https://github.com/FlavioImbertDomingos/voltage-toolkit
+documentation: https://github.com/FlavioImbertDomingos/voltage-toolkit/tree/main/ansible_collections/flavioimbertdomingos/voltage
+homepage: https://github.com/FlavioImbertDomingos/voltage-toolkit
+issues: https://github.com/FlavioImbertDomingos/voltage-toolkit/issues
+build_ignore:
+  - tests/output
+  - "*.tar.gz"

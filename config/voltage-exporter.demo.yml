@@ -1,0 +1,36 @@
+# Demo config: points at the mock appliance in docker-compose.
+exporter:
+  port: 9743
+  interval_seconds: 15
+
+targets:
+  - name: demo-prod
+    policy_url: https://voltage:8443/policy/clientPolicy.xml
+    ws_url: https://voltage:8443
+    api: rest
+    identity: probe@demo.bank
+    auth:
+      method: shared_secret
+      secret_env: VOLTAGE_SHARED_SECRET
+    verify_tls: false            # self-signed mock cert; use ca_cert in real life
+    timeout_seconds: 5
+    probes:
+      - {format: CC,        sample: "4111111111111111"}
+      - {format: SSN,       sample: "123-45-6789"}
+      - {format: AlphaNumeric, sample: "Order7781X"}
+      - {format: CC-ST-64O, sample: "5500000000000004", tokenization: true}
+    labels: {site: demo}
+
+  # The same appliance over SOAP, so both code paths stay honest.
+  - name: demo-prod-soap
+    policy_url: https://voltage:8443/policy/clientPolicy.xml
+    ws_url: https://voltage:8443
+    api: soap
+    identity: monitor
+    auth:
+      method: password
+      username: monitor
+      secret_env: VOLTAGE_PASSWORD
+    verify_tls: false
+    probes:
+      - {format: CC, sample: "4242424242424242"}

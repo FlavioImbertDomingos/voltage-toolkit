@@ -1,0 +1,11 @@
+# Repo-wide ruff config (exporter/ has its own in pyproject.toml, which takes precedence there).
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+
+[lint.per-file-ignores]
+# Dashboard builder is a table of panel definitions; long lines read better than wrapped ones.
+"grafana/build_dashboard.py" = ["E501"]
+"mock-voltage/app.py" = ["E501"]
