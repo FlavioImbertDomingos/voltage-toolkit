@@ -13,6 +13,9 @@ Two things in one repo:
 
 Plus a mock appliance, so all of it runs with `docker compose up` and no Voltage licence.
 
+<img width="919" height="500" alt="image" src="https://github.com/user-attachments/assets/7bbc2767-f56c-47d3-b7ba-5d4f4a2a9192" />
+
+
 [![CI](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
