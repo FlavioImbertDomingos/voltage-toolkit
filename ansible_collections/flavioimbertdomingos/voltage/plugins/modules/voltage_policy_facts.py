@@ -44,14 +44,19 @@ ansible_facts:
       type: dict
       returned: always
       sample:
-        version: "7.0.2"
+        version: "7.0.3"
         district: prod
         policy_id: prod-2026-09
+        server_version: "7.0.3.100100"
         format_names: [CC, SSN, CC-ST-64O]
         formats:
           - {name: CC, kind: fpe, type: FPE}
         auth_methods: [SharedSecret, LDAP]
         key_servers: ["https://voltage-pp-0000.example.com/vibekeys/"]
+        key_tables:
+          - {name: PCI, current_number: 4, keys: [{number: 4, algorithm: FPE, key_size: 256}]}
+        efpe_formats: [CC-EFPE]
+        format_domain_sizes: {CC: 1000000, SSN: 100000}
         sha256: "04315d33..."
         fetch_seconds: 0.041
 policy:

@@ -44,6 +44,29 @@ def main(argv: list[str] | None = None) -> int:
             status = "ok" if r.policy_ok else "FAIL " + r.policy_error
             extra = f" ({len(r.policy.formats)} formats, district={r.policy.district!r})" if r.policy else ""
             print(f"[{t.name}] policy: {status}{extra}")
+            if r.policy:
+                from .lifecycle import support_end
+                from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
+
+                if r.policy.server_version:
+                    se = support_end(r.policy.server_version, config.support_end)
+                    tail = f", {se[0]} maintenance ends {time.strftime('%Y-%m-%d', time.gmtime(se[1]))}" if se else ""
+                    print(f"[{t.name}] appliance: {r.policy.server_version}{tail}")
+                for kt in r.policy.key_tables:
+                    cur = kt.current or {}
+                    print(
+                        f"[{t.name}] key table {kt.name}: current #{kt.current_number} "
+                        f"({cur.get('algorithm', '?')}-{cur.get('key_size', '?')}), {len(kt.keys)} version(s)"
+                    )
+                for f in r.policy.formats:
+                    n = format_domain_size(f)
+                    flags = []
+                    if n is not None and n < MIN_FPE_DOMAIN:
+                        flags.append(f"domain {n:,} < {MIN_FPE_DOMAIN:,} (SP 800-38G Rev. 1)")
+                    if is_efpe(f):
+                        flags.append("eFPE: not join-safe")
+                    if flags:
+                        print(f"[{t.name}] format {f['name']}: " + "; ".join(flags))
             for tk in r.tokenize:
                 status = "ok" if tk.ok else f"FAIL [{tk.error_kind}] {tk.error}"
                 lat = f" protect={tk.protect_seconds:.3f}s access={tk.access_seconds:.3f}s" if tk.ok else ""

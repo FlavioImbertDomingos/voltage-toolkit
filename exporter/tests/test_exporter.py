@@ -90,7 +90,7 @@ def test_config_missing_secret(tmp_path, monkeypatch):
 # --------------------------------------------------------------------- live against the mock
 def test_rest_roundtrip(mock_server, healthy):
     r = run_target(target_for(mock_server))
-    assert r.policy_ok and r.policy.district == "prod" and len(r.policy.formats) == 7
+    assert r.policy_ok and r.policy.district == "prod" and len(r.policy.formats) == 8
     assert all(t.ok for t in r.tokenize), [t.error for t in r.tokenize]
     cc = r.tokenize[0]
     assert cc.roundtrip_ok and cc.format_preserved and cc.protect_seconds < 2
@@ -163,3 +163,143 @@ def test_client_certificate_helper(mock_server):
     host, port = host_port(https)
     info = VoltageClient.certificate(host, port)
     assert "Mock Voltage" in info["subject"] and info["tls_version"].startswith("TLS")
+
+
+# --------------------------------------------------------------------- policy: crypto facts (R1, R2, R5, R12)
+RICH_POLICY = """<?xml version="1.0"?>
+<clientPolicy version="7.0.3" district="prod" policyId="p1">
+  <server name="SecureDataAppliance" version="7.0.3.100100"/>
+  <keyNumberConfig>
+    <keyNumberTable name="PCI" currentNumber="4">
+      <keyNumber number="1" algorithm="FPE" keySize="128"/>
+      <keyNumber number="4" algorithm="FPE" keySize="256"/>
+    </keyNumberTable>
+    <keyNumberTable name="NOCURRENT">
+      <keyNumber number="7" algorithm="AES"/>
+    </keyNumberTable>
+  </keyNumberConfig>
+  <FormatMappings>
+    <Format name="CC" alphabet="digits" length="16" preserveLeading="6" preserveTrailing="4"/>
+    <Format name="SSN" alphabet="0-9" length="9" preserveTrailing="4"/>
+    <Format name="CVV" alphabet="0123456789" length="3"/>
+    <Format name="STATE" alphabet="A-Z" length="2"/>
+    <Format name="CC-EFPE" alphabet="digits" length="16" preserveLeading="6" preserveTrailing="4" encryption="eFPE"/>
+    <Format name="ALNUM" alphabet="alphanumeric" minLength="6" maxLength="64"/>
+    <Format name="NESTED"><alphabet>hex</alphabet><length>8</length></Format>
+    <Format name="MYSTERY"/>
+  </FormatMappings>
+  <TokenizationFormats><Format name="CC-ST-64O" engine="SST" alphabet="digits" length="16"/></TokenizationFormats>
+</clientPolicy>"""
+
+
+def test_parse_key_tables_and_server_version():
+    from voltage_exporter.policy import parse_policy
+
+    p = parse_policy(RICH_POLICY)
+    assert p.server_version == "7.0.3.100100"
+    assert [t.name for t in p.key_tables] == ["PCI", "NOCURRENT"]
+    pci = p.key_tables[0]
+    assert pci.current_number == 4 and len(pci.keys) == 2
+    assert pci.current == {"number": 4, "algorithm": "FPE", "key_size": 256}
+    # no currentNumber attribute -> assume the highest listed key number
+    assert p.key_tables[1].current_number == 7 and p.key_tables[1].current["key_size"] is None
+    d = p.to_dict()
+    assert d["server_version"] == "7.0.3.100100" and d["key_tables"][0]["current_number"] == 4
+    assert d["efpe_formats"] == ["CC-EFPE"]
+    assert d["format_domain_sizes"]["SSN"] == 100_000
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("CC", 10**6),  # 16 digits, 6 + 4 preserved -> exactly at the NIST floor
+        ("SSN", 10**5),  # last-4 preserving SSN is *under* the floor -- true in real deployments too
+        ("CVV", 10**3),
+        ("STATE", 26**2),
+        ("CC-EFPE", 10**6),
+        ("ALNUM", 62**6),  # minimum length is the weakest case
+        ("NESTED", 16**8),  # attributes given as child elements
+        ("MYSTERY", None),  # policy says nothing -> no guess
+        ("CC-ST-64O", None),  # tokenization is not a permutation on a domain
+    ],
+)
+def test_format_domain_size(name, expected):
+    from voltage_exporter.policy import format_domain_size, parse_policy
+
+    fmt = {f["name"]: f for f in parse_policy(RICH_POLICY).formats}[name]
+    assert format_domain_size(fmt) == expected
+
+
+def test_is_efpe():
+    from voltage_exporter.policy import is_efpe
+
+    assert is_efpe({"name": "x", "encryption": "eFPE"})
+    assert is_efpe({"name": "x", "type": "EmbeddedFPE"})
+    assert is_efpe({"name": "x", "embeddedKey": "true"})
+    assert not is_efpe({"name": "eFPE-looking-name", "type": "FPE"})  # the name alone proves nothing
+    assert not is_efpe({"name": "x", "kind": "fpe"})
+
+
+def test_support_end_lookup():
+    import datetime as dt
+
+    from voltage_exporter.lifecycle import split_version, support_end
+
+    rel, ts = support_end("7.0.3.100100")
+    assert rel == "DPP Foundation CE 24.4"
+    assert dt.datetime.fromtimestamp(ts, dt.UTC).date() == dt.date(2027, 11, 30)
+    assert support_end("7.1.1.100286") is None  # not public -> no guess
+    assert support_end("") is None
+    # operator overrides: plain date, or {release, end}; longest prefix wins
+    ov = {"7.1": "2028-06-30", "7.1.1": {"release": "CE 25.2", "end": "2028-09-30"}}
+    assert support_end("7.1.0.5", ov)[0] == "7.1"
+    assert support_end("7.1.1.100286", ov)[0] == "CE 25.2"
+    assert support_end("7.1.1.100286", {"7.1.1": "not-a-date"}) is None
+    assert split_version("7.0.3.100100") == ("7", "7.0") and split_version("8") == ("8", "8")
+
+
+def test_metrics_expose_crypto_policy_facts(mock_server, healthy):
+    from prometheus_client import REGISTRY
+
+    from voltage_exporter.config import Config
+
+    _, _, mod = mock_server
+    tgt = target_for(mock_server, name="crypto")
+    metrics.configure(Config(targets=[tgt], support_end={"7.0.3": "2027-11-30"}))
+    metrics.apply(run_target(tgt))
+
+    def g(name, **labels):
+        return REGISTRY.get_sample_value(name, {"target": "crypto", **labels})
+
+    assert g("voltage_key_table_current_number", table="PCI") == 4.0
+    assert g("voltage_key_table_versions", table="PCI") == 4.0
+    assert g("voltage_key_current_size_bits", table="PCI") == 256.0
+    assert g("voltage_key_info", table="PCI", number="1", algorithm="FPE", key_size="128") == 1.0
+    assert g("voltage_key_rotations_total", table="PCI") == 0.0
+    assert g("voltage_format_domain_size", format="CC") == 1e6
+    assert g("voltage_format_below_minimum_domain", format="CC") == 0.0
+    assert g("voltage_format_below_minimum_domain", format="SSN") == 1.0
+    assert g("voltage_format_domain_size", format="ORA-DATE") is None  # unknown -> no series
+    assert g("voltage_policy_format_efpe", format="CC-EFPE") == 1.0
+    assert g("voltage_policy_format_efpe", format="CC") is None
+    assert g("voltage_appliance_version_info", version="7.0.3.100100", major="7", minor="7.0") == 1.0
+    assert g("voltage_support_end_timestamp_seconds", version="7.0.3.100100", release="DPP Foundation CE 24.4") > 0
+
+    # a rotation is a currentNumber change between two cycles
+    mod._state["scenario"] = "key-rotated"
+    metrics.apply(run_target(tgt))
+    assert g("voltage_key_table_current_number", table="PCI") == 5.0
+    assert g("voltage_key_table_versions", table="PCI") == 5.0
+    assert g("voltage_key_rotations_total", table="PCI") == 1.0
+    mod._state["scenario"] = "weak-key"
+    metrics.apply(run_target(tgt))
+    assert g("voltage_key_current_size_bits", table="PII") == 128.0
+
+
+def test_efpe_format_round_trips_like_fpe(mock_server, healthy):
+    """eFPE is still reversible; only *determinism across epochs* differs (that is R3's job)."""
+    from voltage_exporter.config import ProbeSpec
+
+    tgt = target_for(mock_server, probes=[ProbeSpec("CC-EFPE", "4111111111111111")])
+    r = run_target(tgt)
+    assert r.tokenize[0].ok and r.tokenize[0].roundtrip_ok and r.tokenize[0].format_preserved

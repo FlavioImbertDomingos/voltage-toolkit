@@ -18,6 +18,8 @@ groups:
         expr: histogram_quantile(0.95, sum by (target, format, le) (rate(voltage_access_seconds_bucket[10m])))
       - record: voltage:certificate_days_until_expiry
         expr: (voltage_certificate_expiry_timestamp_seconds - time()) / 86400
+      - record: voltage:support_days_remaining
+        expr: (voltage_support_end_timestamp_seconds - time()) / 86400
 
   - name: voltage-availability
     rules:
@@ -131,3 +133,45 @@ groups:
         annotations:
           summary: "Cannot complete a TLS handshake with {{ $labels.host }} ({{ $labels.target }})"
           description: "Host down, port filtered, or a certificate/cipher problem."
+
+  # What the policy file says about the cryptography itself. All of these come from
+  # clientPolicy.xml alone -- no protect/access calls -- so they work with a read-only,
+  # unauthenticated probe.
+  - name: voltage-crypto-policy
+    rules:
+      - alert: VoltageKeyRotated
+        expr: increase(voltage_key_rotations_total[30m]) > 0
+        labels: {severity: info}
+        annotations:
+          summary: "Key table {{ $labels.table }} rotated on {{ $labels.target }}"
+          description: "currentNumber changed (now {{ with printf `voltage_key_table_current_number{target=\"%s\",table=\"%s\"}` $labels.target $labels.table | query }}{{ . | first | value }}{{ end }}). Expected inside a crypto-period change window; otherwise investigate. Old key numbers stay listed so existing ciphertext still decrypts -- but eFPE columns will now hold two ciphertext epochs."
+
+      - alert: VoltageWeakCurrentKey
+        expr: voltage_key_current_size_bits > 0 and voltage_key_current_size_bits < 256
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Key table {{ $labels.table }} on {{ $labels.target }} is using a {{ $value }}-bit key"
+          description: "The current key is below AES-256. OpenText's own post-quantum position rests on 256-bit symmetric keys (128-bit security under Grover); a 128-bit key does not get that argument. Rotate to a 256-bit key number."
+
+      - alert: VoltageFormatBelowMinimumDomain
+        expr: voltage_format_below_minimum_domain == 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "FPE format {{ $labels.format }} on {{ $labels.target }} has a domain under 10^6"
+          description: "Estimated domain {{ with printf `voltage_format_domain_size{target=\"%s\",format=\"%s\"}` $labels.target $labels.format | query }}{{ . | first | value | humanize }}{{ end }} (radix ** encrypted positions). NIST SP 800-38G Rev. 1 makes a minimum of one million a requirement for FF1 -- small domains are attackable regardless of mode. Typical culprits: CVV, last-4-preserving SSN, state codes, short IDs. Use SST, FPH, or a schema change with AES instead."
+
+      - alert: VoltageVersionApproachingEndOfSupport
+        expr: voltage:support_days_remaining < 180 and voltage:support_days_remaining >= 0
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.target }} runs {{ $labels.version }}: vendor maintenance ends in {{ $value | printf \"%.0f\" }} days"
+          description: "{{ $labels.release }} leaves maintenance soon. Plan the upgrade -- and test the identity/master-secret restore first, the upgrade path depends on a database backup that has a documented failure mode."
+
+      - alert: VoltageVersionOutOfSupport
+        expr: voltage:support_days_remaining < 0
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.target }} runs {{ $labels.version }}, out of vendor maintenance"
+          description: "{{ $labels.release }} maintenance ended {{ with printf `-voltage:support_days_remaining{target=\"%s\",version=\"%s\"}` $labels.target $labels.version | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }} days ago. No security fixes; a PCI DSS 6.3.3 finding waiting to happen."
