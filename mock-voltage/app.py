@@ -23,6 +23,8 @@ Scenarios (switch at runtime: `curl -X POST localhost:8800/mock/scenario/slow`):
   policy-changed  a new format appears in the policy (drift)
   key-rotated     key table PCI: currentNumber 4 -> 5
   weak-key        key table PII current key drops to 128-bit
+  format-leak     access under the wrong format returns the plaintext -- format isolation broken
+  nondeterministic protect(x) != protect(x); access still recovers x -- referential integrity broken
   cert-expiring   (startup only) HTTPS cert valid for 7 days -- MOCK_TLS_CERT_DAYS=7
 """
 
@@ -125,6 +127,8 @@ SCENARIOS = {
     "policy-changed": "A new format (PHONE) appears in the policy.",
     "key-rotated": "Key table PCI rotates: currentNumber 4 -> 5 (a new 256-bit key appears).",
     "weak-key": "Key table PII's current key is 128-bit.",
+    "format-leak": "access() under the *wrong* format returns the original plaintext (formats share a key).",
+    "nondeterministic": "protect() returns a different token every call (round-trip still works).",
 }
 _state = {
     "scenario": os.environ.get("MOCK_SCENARIO", "healthy"),
@@ -155,27 +159,56 @@ _UP = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 _LOW = _UP.lower()
 
 
+def _current_key_number(table: str) -> int:
+    n = KEY_TABLES[table]["currentNumber"]
+    if table == "PCI" and scenario() == "key-rotated":
+        n = 5
+    return n
+
+
+_EFPE_KEYS: dict[str, int] = {}
+
+
 def fpe(value: str, fmt: str, reverse: bool = False) -> str:
-    """Length- and class-preserving substitution. Position-dependent so it's not a trivial table."""
+    """Length- and class-preserving substitution. Position-dependent so it's not a trivial table.
+
+    eFPE formats behave like the real thing in the way that matters to a monitor: the
+    permutation is keyed on the table's *current key number*, so after a rotation the same
+    plaintext protects differently -- and old ciphertext still decrypts, because the key
+    number it was made with is recoverable (real eFPE embeds it in the ciphertext; this toy
+    remembers it in a dict, which is not cryptography and is not pretending to be).
+    """
     out = []
     keep = set()
+    efpe = FPE_FORMATS.get(fmt, {}).get("encryption", "").lower() == "efpe"
     if fmt in ("CC", "CC-EFPE"):
         digits_idx = [i for i, c in enumerate(value) if c.isdigit()]
         keep = set(digits_idx[:6] + digits_idx[-4:])  # keep BIN + last 4 like a real CC format
+    key_no = 0
+    if efpe:
+        table = FPE_FORMATS[fmt].get("keyTable", "PCI")
+        key_no = (
+            _EFPE_KEYS.get(value, _current_key_number(table))
+            if reverse
+            else _current_key_number(table)
+        )
     for i, ch in enumerate(value):
         if i in keep:
             out.append(ch)
             continue
         for alphabet in (_DIG, _UP, _LOW):
             if ch in alphabet:
-                p = _perm(alphabet, f"{fmt}:{i}")
+                p = _perm(alphabet, f"{fmt}:{i}:k{key_no}")
                 if reverse:
                     p = {v: k for k, v in p.items()}
                 out.append(p[ch])
                 break
         else:
             out.append(ch)
-    return "".join(out)
+    result = "".join(out)
+    if efpe and not reverse:
+        _EFPE_KEYS[result] = key_no
+    return result
 
 
 def tokenize(value: str, fmt: str, reverse: bool = False) -> str:
@@ -229,12 +262,39 @@ def _maybe_delay_or_fail():
     return None
 
 
+_NONDET: dict[str, str] = {}
+
+
 def _do(op: str, fmt: str, values: list[str]) -> list[str] | str:
     if fmt in TOKEN_FORMATS:
         return [tokenize(v, fmt, reverse=(op == "access")) for v in values]
     if fmt in FPE_FORMATS or (fmt == "PHONE" and scenario() == "policy-changed"):
-        return [fpe(v, fmt, reverse=(op == "access")) for v in values]
+        if scenario() == "format-leak" and op == "access":
+            # "formats share a key": whatever format you name, you get the plaintext back
+            return [_leak_access(v) for v in values]
+        if scenario() == "nondeterministic" and not FPE_FORMATS.get(fmt, {}).get("encryption"):
+            if op == "protect":
+                out = []
+                for v in values:
+                    tok = "".join(random.choice(_DIG) if c.isdigit() else c for c in v)
+                    _NONDET[tok] = v
+                    out.append(tok)
+                return out
+            return [_NONDET.get(v, fpe(v, fmt, reverse=True)) for v in values]
+        res = [fpe(v, fmt, reverse=(op == "access")) for v in values]
+        if op == "protect":
+            _PROTECTED.update(zip(res, values, strict=True))
+        return res
     return f"unknown format {fmt!r}"
+
+
+def _leak_access(token: str) -> str:
+    """Return the plaintext regardless of the format named. (A real appliance leaks like this
+    when two formats are bound to the same key; the mock just remembers what it protected.)"""
+    return _PROTECTED.get(token, token)
+
+
+_PROTECTED: dict[str, str] = {}
 
 
 # ------------------------------------------------------------------ policy

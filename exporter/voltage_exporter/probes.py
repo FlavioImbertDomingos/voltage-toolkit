@@ -5,6 +5,14 @@ tokenize   protect(sample) then access(token) -> latency of each, round-trip cor
            format preservation (same length, same character classes as the sample)
 tls        certificate expiry of the policy host, the WS host, every key server, extra hosts
 keyserver  HTTPS reachability of each key server URL from the policy
+integrity  the failures that produce no error at all (roadmap R3):
+             determinism      protect(x) == protect(x) -- referential integrity across tables
+                              depends on it; skipped for eFPE formats, which legitimately differ
+                              per key epoch
+             double-protect   access(protect(protect(x))) == protect(x) -- protecting an
+                              already-protected value must still be reversible, not garbage
+             format-isolation access(protect_A(x)) under format B must not return x -- an
+                              error is fine, a different value is fine, the plaintext is not
 
 A tokenize probe uses a *synthetic* sample (a test PAN / SSN from config), never real
 data, and the exporter never logs the protected value.
@@ -37,6 +45,15 @@ class TokenizeResult:
 
 
 @dataclass
+class IntegrityResult:
+    check: str  # determinism | double_protect | format_isolation
+    format: str
+    against: str = ""  # format_isolation only: the format access was attempted under
+    ok: bool | None = None  # None = could not evaluate (protect failed etc.)
+    detail: str = ""
+
+
+@dataclass
 class TlsResult:
     host: str
     port: int
@@ -57,6 +74,7 @@ class TargetResult:
     tokenize: list[TokenizeResult] = field(default_factory=list)
     tls: list[TlsResult] = field(default_factory=list)
     keyservers: dict[str, bool] = field(default_factory=dict)
+    integrity: list[IntegrityResult] = field(default_factory=list)
     duration: float = 0.0
 
 
@@ -105,6 +123,75 @@ def run_tokenize(client: VoltageClient, spec: ProbeSpec) -> TokenizeResult:
     return res
 
 
+def _protect(client: VoltageClient, spec: ProbeSpec, value: str) -> str:
+    return str(client.protect(spec.format, value, spec.identity).value)
+
+
+def run_integrity(client: VoltageClient, target: Target, efpe_formats: set[str]) -> list[IntegrityResult]:
+    """The silent ones. Every check here is a failure mode that returns HTTP 200 and plausible data."""
+    out: list[IntegrityResult] = []
+    fpe_specs = [s for s in target.probes if not s.tokenization]
+
+    # 1. determinism: same plaintext, same identity, same format -> same ciphertext
+    if target.integrity_determinism:
+        for spec in fpe_specs:
+            if spec.format in efpe_formats:
+                log.debug("[%s] determinism: skipping eFPE format %s", target.name, spec.format)
+                continue
+            r = IntegrityResult("determinism", spec.format)
+            try:
+                a, b = _protect(client, spec, spec.sample), _protect(client, spec, spec.sample)
+                r.ok = a == b
+                if not r.ok:
+                    r.detail = "protect(x) returned two different values for the same input"
+            except Exception as exc:  # noqa: BLE001
+                r.detail = f"{type(exc).__name__}: {exc}"
+            out.append(r)
+
+    # 2. double protect: protect(protect(x)) must be reversible back to protect(x)
+    if target.integrity_double_protect:
+        for spec in fpe_specs:
+            r = IntegrityResult("double_protect", spec.format)
+            try:
+                once = _protect(client, spec, spec.sample)
+                twice = _protect(client, spec, once)
+                back = str(client.access(spec.format, twice, spec.identity).value)
+                r.ok = back == once
+                if not r.ok:
+                    r.detail = "access(protect(protect(x))) != protect(x)"
+            except Exception as exc:  # noqa: BLE001
+                r.detail = f"{type(exc).__name__}: {exc}"
+            out.append(r)
+
+    # 3. format isolation: a token made under A, accessed under B, must not yield the plaintext
+    if target.integrity_format_isolation:
+        pairs = list(target.isolation_pairs)
+        if not pairs and len(fpe_specs) >= 2:
+            names = [s.format for s in fpe_specs]
+            pairs = [(names[i], names[(i + 1) % len(names)]) for i in range(len(names))]
+        by_name = {s.format: s for s in fpe_specs}
+        for a, b in pairs:
+            spec = by_name.get(a)
+            r = IntegrityResult("format_isolation", a, against=b)
+            if spec is None:
+                r.detail = f"no probe configured for format {a!r}"
+                out.append(r)
+                continue
+            try:
+                token = _protect(client, spec, spec.sample)
+                try:
+                    leaked = str(client.access(b, token, spec.identity).value)
+                except VoltageError:
+                    leaked = None  # the appliance refused: that is isolation working
+                r.ok = leaked != spec.sample
+                if not r.ok:
+                    r.detail = f"access under {b} returned the plaintext protected under {a}"
+            except Exception as exc:  # noqa: BLE001
+                r.detail = f"{type(exc).__name__}: {exc}"
+            out.append(r)
+    return out
+
+
 def run_tls(host: str, port: int, timeout: float) -> TlsResult:
     res = TlsResult(host=host, port=port)
     try:
@@ -139,6 +226,14 @@ def run_target(target: Target) -> TargetResult:
         if not r.ok:
             log.warning("[%s] tokenize %s: %s", target.name, spec.format, r.error)
         out.tokenize.append(r)
+
+    # 2b. integrity: the failures that return 200 and wrong data
+    efpe = set(out.policy.efpe_formats) if out.policy else set()
+    out.integrity = run_integrity(client, target, efpe)
+    for r in out.integrity:
+        if r.ok is False:
+            where = f"{r.format}->{r.against}" if r.against else r.format
+            log.error("[%s] INTEGRITY %s %s: %s", target.name, r.check, where, r.detail)
 
     # 3. TLS: policy host, WS host, key servers, extras (deduplicated)
     hosts: list[tuple[str, int]] = []

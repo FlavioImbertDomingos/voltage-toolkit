@@ -27,9 +27,13 @@ Use synthetic values that exercise each format but are not real data:
 
 ## Probe rate
 
-Each probe = 2 Web Services calls per interval. 3 formats × 30 s = 6 calls/min per district —
-noise next to production traffic, but agree it with the Voltage team and pick an interval
-accordingly (`interval_seconds`).
+Each probe = 2 Web Services calls per interval. The integrity checks add, per FPE format:
+2 (determinism) + 3 (double-protect) + 2 (format isolation) = 7 more. So 3 FPE formats × 30 s ≈
+27 calls/min per district — still noise next to production traffic, but agree it with the
+Voltage team and pick an interval accordingly (`interval_seconds`), or turn individual checks
+off under `integrity:`. The format-isolation check will show up in the appliance's logs as
+access attempts under the wrong format from the probe identity — tell whoever reads those logs
+first, because it looks exactly like what it is testing for.
 
 ## Verify before you deploy
 

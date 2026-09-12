@@ -40,6 +40,13 @@ it hands the machine a fake card number, gets a token, hands the token back, and
 the same fake number. It times both steps and writes the results on a whiteboard for
 Prometheus. If anything is slow, wrong or broken, an alert fires before customers notice.
 
+It also asks the trick questions a customer never would: *does the same card number always get
+the same token?* (if not, every report that joins two tables silently loses rows), *if I hand a
+card-number token to the social-security window, do I get the card number back?* (if so, the
+windows share a key and anyone with one badge can read everything), and *if I tokenize a token,
+can I still get back to where I was?* The machine says "OK" to all of these even when the answer
+is wrong. Only a robot that checks would know.
+
 **The Ansible collection is the rulebook.** It writes down, in git, which districts should
 exist, which formats they offer, which applications (identities) may use them and how they
 log in — and every night it checks the machine still agrees with the rulebook.
@@ -82,6 +89,8 @@ curl -X POST localhost:8800/mock/scenario/keyserver-down  # key server alert
 curl -X POST localhost:8800/mock/scenario/policy-changed  # drift: a format appeared
 curl -X POST localhost:8800/mock/scenario/key-rotated     # key table PCI: currentNumber 4 -> 5
 curl -X POST localhost:8800/mock/scenario/weak-key        # a 128-bit current key
+curl -X POST localhost:8800/mock/scenario/format-leak     # a CC token detokenizes under SSN — round-trip stays green
+curl -X POST localhost:8800/mock/scenario/nondeterministic # protect(x) != protect(x) — round-trip stays green
 curl -X POST localhost:8800/mock/scenario/healthy
 ```
 
@@ -151,6 +160,7 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 |---|---|---|
 | Can apps tokenize right now? | `voltage_tokenize_success`, `VoltageTokenizationFailing` | The only question that matters at 3 a.m. |
 | Is the data coming back right? | `voltage_tokenize_roundtrip_ok`, `VoltageRoundTripMismatch` | A wrong detokenize silently corrupts data |
+| Is it *correct*, not just working? | `voltage_integrity_ok{check}`, `VoltageFormatIsolationBroken`, `VoltageNonDeterministic`, `VoltageDoubleProtectCorrupts` | Formats sharing a key, non-deterministic protection, double-protect corruption — all return HTTP 200 |
 | How slow? | `voltage_protect_seconds` histogram, `VoltageLatencyHigh` (p95) | Checkout latency budgets |
 | How often does it fail? | `voltage_tokenize_probes_total{result}`, `VoltageErrorRateHigh` | Intermittent failures apps retry around |
 | Why did it fail? | `voltage_tokenize_errors_total{kind=auth\|http\|timeout\|connection\|mismatch}` | "Somebody rotated the shared secret" vs "the box is down" |
@@ -163,7 +173,7 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 | Which columns can't be joined? | `voltage_policy_format_efpe` | eFPE ciphertext differs per key epoch |
 | Are we running out of support? | `voltage_appliance_version_info`, `voltage_support_end_timestamp_seconds` | The version is in the policy file; the dates are in the release notes |
 
-19 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
+22 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
 routing with inhibition, a Grafana dashboard.
 
 ---
@@ -182,7 +192,7 @@ voltage-toolkit/
 │   ├── playbooks/                      configure, audit, probe, deploy_exporter
 │   ├── docs/ADAPTER.md                 the http / command adapter contract
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
-├── prometheus/                         config + 19 alert rules + promtool tests
+├── prometheus/                         config + 22 alert rules + promtool tests
 ├── alertmanager/ · grafana/            routing, inhibition, generated dashboard
 └── docs/                               METRICS, ALERTS, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```

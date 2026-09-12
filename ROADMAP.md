@@ -19,9 +19,9 @@ data only, no production values.
 |---|---|
 | R1 key-version metrics | ✅ shipped — `feat: policy intelligence` |
 | R2 small-domain linter | ✅ shipped — `feat: policy intelligence` |
-| R3 silent-corruption probes | next |
-| R4 policy propagation lag | planned |
-| R5 eFPE awareness | ✅ shipped — `feat: policy intelligence` (detection; determinism exclusion lands with R3) |
+| R3 silent-corruption probes | ✅ shipped — `feat: silent-corruption probes` |
+| R4 policy propagation lag | next |
+| R5 eFPE awareness | ✅ shipped — detection in `feat: policy intelligence`, determinism exclusion in `feat: silent-corruption probes` |
 | R6–R9 coverage / SDM seam | planned |
 | R10–R11, R13–R16 | planned |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
@@ -60,7 +60,7 @@ policy from its alphabet and length, and emits `voltage_format_domain_size{forma
 This is the item most likely to be genuinely novel to a reviewer. It turns a standards
 footnote into an alert.
 
-### R3. Silent-corruption probes · **M**
+### R3. Silent-corruption probes · **M** · ✅ shipped
 
 Vertica's integration docs document three failure modes that produce **no error at all**:
 decrypting with a mismatched format "produces incorrect plaintext"; `VoltageSecureAccess()` on

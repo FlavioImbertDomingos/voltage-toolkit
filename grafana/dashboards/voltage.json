@@ -461,7 +461,7 @@
       "gridPos": {
         "x": 0,
         "y": 5,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -523,7 +523,7 @@
       "type": "stat",
       "title": "Formats in policy",
       "gridPos": {
-        "x": 6,
+        "x": 4,
         "y": 5,
         "w": 4,
         "h": 4
@@ -573,7 +573,7 @@
       "type": "stat",
       "title": "Policy changes (24h)",
       "gridPos": {
-        "x": 10,
+        "x": 8,
         "y": 5,
         "w": 4,
         "h": 4
@@ -627,7 +627,7 @@
       "type": "stat",
       "title": "Probe cycle",
       "gridPos": {
-        "x": 14,
+        "x": 12,
         "y": 5,
         "w": 4,
         "h": 4
@@ -679,9 +679,9 @@
       "type": "stat",
       "title": "Last probe",
       "gridPos": {
-        "x": 18,
+        "x": 16,
         "y": 5,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -736,6 +736,71 @@
     },
     {
       "id": 24,
+      "type": "stat",
+      "title": "Silent-corruption checks",
+      "gridPos": {
+        "x": 20,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(voltage_integrity_ok{target=~\"$target\"})",
+          "legendFormat": "__auto",
+          "refId": "R25",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAIL",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 26,
       "type": "row",
       "title": "Latency & errors",
       "collapsed": false,
@@ -748,7 +813,7 @@
       "panels": []
     },
     {
-      "id": 28,
+      "id": 30,
       "type": "timeseries",
       "title": "protect latency p50 / p95 / p99",
       "gridPos": {
@@ -769,7 +834,7 @@
           },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p50",
-          "refId": "R25"
+          "refId": "R27"
         },
         {
           "datasource": {
@@ -778,7 +843,7 @@
           },
           "expr": "histogram_quantile(0.95, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p95",
-          "refId": "R26"
+          "refId": "R28"
         },
         {
           "datasource": {
@@ -787,7 +852,7 @@
           },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p99",
-          "refId": "R27"
+          "refId": "R29"
         }
       ],
       "fieldConfig": {
@@ -832,7 +897,7 @@
       }
     },
     {
-      "id": 30,
+      "id": 32,
       "type": "timeseries",
       "title": "access latency p95 by format",
       "gridPos": {
@@ -853,7 +918,7 @@
           },
           "expr": "voltage:access_p95_seconds_10m{target=~\"$target\"}",
           "legendFormat": "{{target}} {{format}}",
-          "refId": "R29"
+          "refId": "R31"
         }
       ],
       "fieldConfig": {
@@ -882,7 +947,7 @@
       }
     },
     {
-      "id": 32,
+      "id": 34,
       "type": "timeseries",
       "title": "Error ratio by format (10m)",
       "gridPos": {
@@ -903,7 +968,7 @@
           },
           "expr": "voltage:tokenize_error_ratio_10m{target=~\"$target\"}",
           "legendFormat": "{{target}} {{format}}",
-          "refId": "R31"
+          "refId": "R33"
         }
       ],
       "fieldConfig": {
@@ -950,7 +1015,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 36,
       "type": "timeseries",
       "title": "Failures by kind (per 10m)",
       "gridPos": {
@@ -971,7 +1036,7 @@
           },
           "expr": "sum by (kind) (increase(voltage_tokenize_errors_total{target=~\"$target\"}[10m]))",
           "legendFormat": "{{kind}}",
-          "refId": "R33"
+          "refId": "R35"
         }
       ],
       "fieldConfig": {
@@ -999,7 +1064,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 37,
       "type": "row",
       "title": "Configuration & certificates",
       "collapsed": false,
@@ -1012,7 +1077,7 @@
       "panels": []
     },
     {
-      "id": 36,
+      "id": 38,
       "type": "table",
       "title": "Formats offered by the policy",
       "gridPos": {
@@ -1033,7 +1098,7 @@
           },
           "expr": "voltage_policy_format{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R37",
+          "refId": "R39",
           "instant": true
         }
       ],
@@ -1057,7 +1122,7 @@
       }
     },
     {
-      "id": 38,
+      "id": 40,
       "type": "table",
       "title": "Certificates: days to expiry",
       "gridPos": {
@@ -1078,7 +1143,7 @@
           },
           "expr": "sort(voltage:certificate_days_until_expiry{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R39",
+          "refId": "R41",
           "instant": true
         }
       ],
@@ -1104,7 +1169,7 @@
       }
     },
     {
-      "id": 40,
+      "id": 42,
       "type": "table",
       "title": "Policy",
       "gridPos": {
@@ -1125,7 +1190,7 @@
           },
           "expr": "voltage_policy_info{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R41",
+          "refId": "R43",
           "instant": true
         }
       ],
@@ -1149,7 +1214,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 44,
       "type": "row",
       "title": "What the policy says about the crypto",
       "collapsed": false,
@@ -1162,7 +1227,7 @@
       "panels": []
     },
     {
-      "id": 43,
+      "id": 45,
       "type": "stat",
       "title": "Formats under NIST's 10^6 domain floor",
       "gridPos": {
@@ -1183,7 +1248,7 @@
           },
           "expr": "sum(voltage_format_below_minimum_domain{target=~\"$target\"}) or vector(0)",
           "legendFormat": "__auto",
-          "refId": "R44",
+          "refId": "R46",
           "instant": true
         }
       ],
@@ -1216,7 +1281,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 47,
       "type": "stat",
       "title": "eFPE formats (not join-safe)",
       "gridPos": {
@@ -1236,56 +1301,6 @@
             "uid": "prometheus"
           },
           "expr": "count(voltage_policy_format_efpe{target=~\"$target\"}) or vector(0)",
-          "legendFormat": "__auto",
-          "refId": "R46",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 47,
-      "type": "stat",
-      "title": "Key rotations (24h)",
-      "gridPos": {
-        "x": 8,
-        "y": 40,
-        "w": 4,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(voltage_key_rotations_total{target=~\"$target\"}[24h])) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R48",
           "instant": true
@@ -1318,6 +1333,56 @@
     {
       "id": 49,
       "type": "stat",
+      "title": "Key rotations (24h)",
+      "gridPos": {
+        "x": 8,
+        "y": 40,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(voltage_key_rotations_total{target=~\"$target\"}[24h])) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R50",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 51,
+      "type": "stat",
       "title": "Weakest current key (bits)",
       "gridPos": {
         "x": 12,
@@ -1337,7 +1402,7 @@
           },
           "expr": "min(voltage_key_current_size_bits{target=~\"$target\"} > 0)",
           "legendFormat": "__auto",
-          "refId": "R50",
+          "refId": "R52",
           "instant": true
         }
       ],
@@ -1370,7 +1435,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 53,
       "type": "stat",
       "title": "Days of vendor support left",
       "gridPos": {
@@ -1391,7 +1456,7 @@
           },
           "expr": "min(voltage:support_days_remaining{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R52",
+          "refId": "R54",
           "instant": true
         }
       ],
@@ -1429,7 +1494,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 55,
       "type": "table",
       "title": "Key tables",
       "gridPos": {
@@ -1450,7 +1515,7 @@
           },
           "expr": "voltage_key_table_current_number{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R54",
+          "refId": "R56",
           "instant": true
         }
       ],
@@ -1476,7 +1541,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 57,
       "type": "table",
       "title": "FPE domain size per format",
       "gridPos": {
@@ -1497,7 +1562,7 @@
           },
           "expr": "sort(voltage_format_domain_size{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R56",
+          "refId": "R58",
           "instant": true
         }
       ],
@@ -1523,7 +1588,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 59,
       "type": "table",
       "title": "Appliance version",
       "gridPos": {
@@ -1544,7 +1609,7 @@
           },
           "expr": "voltage_appliance_version_info{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R58",
+          "refId": "R60",
           "instant": true
         }
       ],

@@ -12,6 +12,9 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageTokenizationFailing` | round-trip failing | 2m | critical | Look at `voltage_tokenize_errors_total{kind}`: auth → credential rotated; http → appliance error; timeout/connection → network or load |
 | `VoltageAuthFailures` | any `kind="auth"` error in 10m | — | warning | Probe identity's secret rejected: rotated secret, LDAP change, identity disabled |
 | `VoltageRoundTripMismatch` | `access(protect(x)) != x` | — | critical | **Data integrity.** Stop writes; check district / key configuration before tokens are persisted |
+| `VoltageFormatIsolationBroken` | token made under A detokenizes under B | — | critical | **Data exposure.** Two formats share a key or an identity is over-authorized; anyone allowed format B can read format A data. Incident |
+| `VoltageNonDeterministic` | `protect(x) != protect(x)` | — | critical | **Referential integrity.** Joins on the column silently drop rows. Rotation without eFPE, per-call tweak, client bug. eFPE formats are excluded on purpose |
+| `VoltageDoubleProtectCorrupts` | `access(protect(protect(x))) != protect(x)` | 5m | warning | An ETL step that protects twice would corrupt silently. Check format definition and client version |
 | `VoltageErrorRateHigh` | > 5 % failures over 10m | 5m | warning | Intermittent errors apps are retrying around |
 | `VoltageLatencyHigh` | p95 protect > 500 ms | 5m | warning | Appliance load, key server, network path, key rotation in progress |
 | `VoltageFormatNotPreserved` | token shape ≠ sample shape | 2m | warning | Wrong format bound to the identity, or a tokenization format used where FPE expected |
@@ -25,8 +28,8 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageVersionApproachingEndOfSupport` | < 180 days of vendor maintenance | — | warning | Plan the upgrade; **test the identity/master-secret restore first** |
 | `VoltageVersionOutOfSupport` | maintenance ended | — | critical | No security fixes; PCI DSS 6.3.3 finding |
 
-Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / tokenization-failing /
-policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
+Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / format-isolation /
+non-determinism / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
 tokenize alerts; tokenize-failing silences error-rate/latency/auth for the same format).
 
 Thresholds are in the rule expressions — edit, then `promtool test rules` and

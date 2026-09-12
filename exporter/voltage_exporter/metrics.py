@@ -93,6 +93,16 @@ format_preserved = Gauge(
     f"{NS}_tokenize_format_preserved", "1 if the token kept the sample's shape", ["target", "format"]
 )
 
+# ---- integrity: the failures that produce no error (R3)
+integrity_ok = Gauge(
+    f"{NS}_integrity_ok",
+    "1 if the silent-corruption check passed (check = determinism | double_protect | format_isolation)",
+    ["target", "check", "format", "against"],
+)
+integrity_total = Counter(
+    f"{NS}_integrity_checks", "Integrity checks run", ["target", "check", "result"]
+)  # result = pass | fail | error
+
 # ---- tls / key servers
 cert_expiry = Gauge(f"{NS}_certificate_expiry_timestamp_seconds", "Certificate notAfter", ["target", "host", "subject"])
 cert_ok = Gauge(f"{NS}_tls_up", "1 if a TLS handshake with the host succeeded", ["target", "host"])
@@ -191,6 +201,13 @@ def apply(result: TargetResult) -> None:
             roundtrip_ok.labels(t, f).set(1.0 if r.roundtrip_ok else 0.0)
         if r.format_preserved is not None:
             format_preserved.labels(t, f).set(1.0 if r.format_preserved else 0.0)
+
+    for r in result.integrity:
+        if r.ok is None:
+            integrity_total.labels(t, r.check, "error").inc()
+            continue
+        integrity_ok.labels(t, r.check, r.format, r.against).set(1.0 if r.ok else 0.0)
+        integrity_total.labels(t, r.check, "pass" if r.ok else "fail").inc()
 
     for c in result.tls:
         host = f"{c.host}:{c.port}"

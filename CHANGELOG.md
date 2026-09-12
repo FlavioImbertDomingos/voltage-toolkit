@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Silent-corruption probes** (roadmap R3): `voltage_integrity_ok{check=determinism|double_protect|format_isolation}`
+  and `voltage_integrity_checks_total`; alerts `VoltageFormatIsolationBroken` (critical, pages),
+  `VoltageNonDeterministic` (critical, pages), `VoltageDoubleProtectCorrupts` (warning). Determinism is skipped for
+  eFPE formats (completing R5). Per-target `integrity:` config with `isolation_pairs`. Mock scenarios `format-leak`
+  and `nondeterministic`, and the mock's eFPE now actually changes ciphertext across key epochs while old ciphertext
+  still decrypts.
 - **Policy intelligence** (roadmap R1, R2, R5, R12) — everything below is read from `clientPolicy.xml` alone:
   - Key number tables: `voltage_key_table_current_number`, `voltage_key_table_versions`, `voltage_key_info`,
     `voltage_key_current_size_bits`, `voltage_key_rotations_total`; alerts `VoltageKeyRotated`, `VoltageWeakCurrentKey`.
