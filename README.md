@@ -6,7 +6,9 @@ can see inside.**
 Two things in one repo:
 
 1. **`voltage-exporter`** — a Prometheus exporter that *actually tokenizes something* every
-   30 seconds and reports latency, error rate, data integrity, policy drift and certificate expiry.
+   30 seconds and reports latency, error rate, data integrity, policy drift and certificate expiry —
+   and reads what the policy file says about the crypto itself: key rotation, formats whose domain
+   is too small to be safe, eFPE, and how long the appliance version stays in support.
 2. **`flavioimbertdomingos.voltage`** — an Ansible collection: policy facts, a synthetic-probe
    module, config-as-code for identities / districts / auth methods with drift detection, and a
    role that deploys the exporter.
@@ -41,6 +43,15 @@ Prometheus. If anything is slow, wrong or broken, an alert fires before customer
 **The Ansible collection is the rulebook.** It writes down, in git, which districts should
 exist, which formats they offer, which applications (identities) may use them and how they
 log in — and every night it checks the machine still agrees with the rulebook.
+
+**The machine also publishes its own rulebook page** — the policy file every application
+downloads before it can do anything. That page says which key is the current one, how each
+format is shaped, and what version the machine is running. The robot reads it too. So if a key
+quietly rotates, if a format only has a hundred thousand possible values (too few to be safe),
+or if the machine's version is about to fall out of the vendor's support, an alert says so —
+without ever asking the machine to encrypt anything.
+
+![Architecture: appliance, exporter probes, Prometheus, Ansible collection, and what the policy file alone reveals](docs/architecture.png)
 
 
 ---

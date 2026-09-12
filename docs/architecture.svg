@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="690" viewBox="0 70 1280 690" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .h1   { font-size:26px; font-weight:700; fill:#1a1a1a; }
+      .h2   { font-size:20px; font-weight:700; fill:#1a1a1a; }
+      .t    { font-size:17px; fill:#3d3d3d; }
+      .s    { font-size:15px; fill:#4a4a4a; }
+      .cap  { font-size:14px; fill:#6b7280; font-style:italic; }
+      .mono { font-family:"DejaVu Sans Mono",monospace; font-size:14px; fill:#333; }
+      .line { stroke:#9aa5b1; stroke-width:2.5; fill:none; }
+      .arr  { stroke:#1e6b45; stroke-width:2.5; fill:none; marker-end:url(#ah); }
+      .arrb { stroke:#1f4e99; stroke-width:2.5; fill:none; marker-end:url(#ahb); }
+      .arrg { stroke:#8a6410; stroke-width:2.5; fill:none; marker-end:url(#ahg); stroke-dasharray:6 5; }
+    </style>
+    <marker id="ah" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1e6b45"/></marker>
+    <marker id="ahb" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1f4e99"/></marker>
+    <marker id="ahg" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8a6410"/></marker>
+  </defs>
+  <rect y="70" width="1280" height="690" fill="#ffffff"/>
+
+  <!-- Voltage appliance -->
+  <rect x="30" y="120" width="300" height="330" rx="10" fill="#f6ecf7" stroke="#7a3489" stroke-width="2.5"/>
+  <text x="180" y="156" text-anchor="middle" class="h2">Voltage SecureData</text>
+  <text x="180" y="180" text-anchor="middle" class="cap">the appliance (or the mock)</text>
+  <rect x="50" y="200" width="260" height="52" rx="6" fill="#ffffff" stroke="#c9a9d0"/>
+  <text x="180" y="222" text-anchor="middle" class="s" font-weight="700">policy host</text>
+  <text x="180" y="242" text-anchor="middle" class="mono">/policy/clientPolicy.xml</text>
+  <rect x="50" y="262" width="260" height="52" rx="6" fill="#ffffff" stroke="#c9a9d0"/>
+  <text x="180" y="284" text-anchor="middle" class="s" font-weight="700">Web Services</text>
+  <text x="180" y="304" text-anchor="middle" class="mono">/vibesimple  REST · SOAP</text>
+  <rect x="50" y="324" width="260" height="52" rx="6" fill="#ffffff" stroke="#c9a9d0"/>
+  <text x="180" y="346" text-anchor="middle" class="s" font-weight="700">key server</text>
+  <text x="180" y="366" text-anchor="middle" class="mono">/vibekeys/</text>
+  <rect x="50" y="386" width="260" height="44" rx="6" fill="#ffffff" stroke="#c9a9d0"/>
+  <text x="180" y="413" text-anchor="middle" class="s" font-weight="700">TLS certificate</text>
+
+  <!-- exporter -->
+  <rect x="440" y="120" width="380" height="330" rx="10" fill="#e6f4ec" stroke="#1e6b45" stroke-width="2.5"/>
+  <text x="630" y="156" text-anchor="middle" class="h2">voltage-exporter</text>
+  <text x="630" y="180" text-anchor="middle" class="cap">stands in line like a real application, every 30 s</text>
+  <text x="460" y="216" class="s" font-weight="700">1. download the policy</text>
+  <text x="460" y="236" class="s">hash it (drift), parse formats, auth, key servers</text>
+  <text x="460" y="270" class="s" font-weight="700">2. protect(4111…) → token → access(token)</text>
+  <text x="460" y="290" class="s">both latencies · round-trip equality · shape kept</text>
+  <text x="460" y="324" class="s" font-weight="700">3. TLS handshake, every host</text>
+  <text x="460" y="344" class="s">certificate notAfter — the #1 cause of “it all stopped”</text>
+  <text x="460" y="378" class="s" font-weight="700">4. GET each key server</text>
+  <text x="460" y="412" class="s" font-weight="700">5. read what the policy says about the crypto</text>
+  <text x="460" y="432" class="s">key tables · domain sizes · eFPE · version (step 1's file)</text>
+
+  <!-- arrows appliance <-> exporter -->
+  <path class="arr" d="M440 226 H330"/>
+  <path class="arr" d="M440 288 H330"/>
+  <path class="arr" d="M440 350 H330"/>
+  <text x="385" y="112" text-anchor="middle" class="cap">read-only, synthetic samples only</text>
+
+  <!-- prometheus stack -->
+  <rect x="930" y="120" width="320" height="150" rx="10" fill="#eef2f7" stroke="#8fa3b8" stroke-width="2.5"/>
+  <text x="1090" y="156" text-anchor="middle" class="h2">Prometheus</text>
+  <text x="1090" y="182" text-anchor="middle" class="s">19 alert rules, promtool-tested</text>
+  <text x="1090" y="204" text-anchor="middle" class="s">recording rules for p95, error ratio,</text>
+  <text x="1090" y="224" text-anchor="middle" class="s">days-to-expiry, days-of-support</text>
+  <text x="1090" y="254" text-anchor="middle" class="cap">→ Alertmanager (routing, inhibition) → Grafana</text>
+  <path class="arr" d="M820 195 H930"/>
+  <text x="875" y="186" text-anchor="middle" class="mono">/metrics</text>
+
+  <!-- what the policy says (new) -->
+  <rect x="930" y="300" width="320" height="150" rx="10" fill="#fff8e8" stroke="#d8a838" stroke-width="2.5"/>
+  <text x="1090" y="334" text-anchor="middle" class="h2">from the policy file alone</text>
+  <text x="950" y="362" class="s">▸ currentNumber ↑ = a key rotated</text>
+  <text x="950" y="384" class="s">▸ radix^length under 10⁶ = weak format</text>
+  <text x="950" y="406" class="s">▸ eFPE = ciphertext differs per epoch</text>
+  <text x="950" y="428" class="s">▸ &lt;server version&gt; → support end date</text>
+  <path class="arrg" d="M820 442 H930"/>
+
+  <!-- Ansible -->
+  <rect x="30" y="500" width="790" height="150" rx="10" fill="#e8f0fb" stroke="#1f4e99" stroke-width="2.5"/>
+  <text x="425" y="536" text-anchor="middle" class="h2">Ansible collection  flavioimbertdomingos.voltage</text>
+  <text x="425" y="560" text-anchor="middle" class="cap">the rulebook: what should exist, checked every night</text>
+  <text x="50" y="594" class="s"><tspan font-weight="700">voltage_policy_facts</tspan> — same parser, as facts (now incl. key tables, domain sizes, eFPE, version)</text>
+  <text x="50" y="616" class="s"><tspan font-weight="700">voltage_probe</tspan> — one synthetic round-trip, as a task</text>
+  <text x="50" y="638" class="s"><tspan font-weight="700">voltage_district / _identity / _auth_method</tspan> + <tspan font-weight="700">voltage_policy_audit</tspan> — git config vs the appliance → DRIFT</text>
+  <path class="arrb" d="M180 500 V450"/>
+
+  <!-- shared parser -->
+  <rect x="930" y="500" width="320" height="150" rx="10" fill="#f3f6f9" stroke="#b9c4d0"/>
+  <text x="1090" y="534" text-anchor="middle" class="h2">one parser, two homes</text>
+  <text x="1090" y="562" text-anchor="middle" class="mono">exporter/…/policy.py</text>
+  <text x="1090" y="584" text-anchor="middle" class="mono">module_utils/policy.py</text>
+  <text x="1090" y="612" text-anchor="middle" class="s">stdlib only, byte-identical,</text>
+  <text x="1090" y="632" text-anchor="middle" class="s">CI diffs them on every push</text>
+
+  <text x="640" y="710" text-anchor="middle" class="cap">docker compose up → mock appliance + exporter + Prometheus + Alertmanager + Grafana. No licence needed. Break it on purpose with /mock/scenario/…</text>
+</svg>

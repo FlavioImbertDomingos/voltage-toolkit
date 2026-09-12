@@ -7,13 +7,17 @@ config.yml ─► voltage_exporter.config.load()
                  │
                  ▼ every interval_seconds (background thread, one worker per target)
            probes.run_target(target)
-                 ├─ client.fetch_policy()  ──► policy.parse_policy()   (formats, auth, key servers, sha256)
+                 ├─ client.fetch_policy()  ──► policy.parse_policy()   (formats, auth, key servers, sha256,
+                 │                                                       key tables, server version, format attrs)
                  ├─ for each probe: client.protect() ─► client.access() ─► compare
                  ├─ client.certificate() for policy host, WS host, key servers, extras
                  └─ GET each key server URL
                  │
                  ▼
            metrics.apply(result)  ──► prometheus_client Gauges / Counters / Histograms
+                 ├─ policy.format_domain_size() / is_efpe()   per format  (R2, R5)
+                 ├─ key tables → current number, rotation counter, key size  (R1)
+                 └─ lifecycle.support_end(server_version)       (R12; built-in table + config overrides)
                  │
                  ▼
            /metrics  (start_http_server)
@@ -29,6 +33,22 @@ reverse. `voltage_tokenize_roundtrip_ok` is the metric that catches that.
 
 **Why hash the policy:** clientPolicy.xml is the only unauthenticated view of the district's
 configuration. A hash change is either a change window or an incident.
+
+**Why read the key tables:** `<keyNumberTable currentNumber=…>` is how the appliance actually
+rotates keys (old numbers stay listed so old ciphertext still decrypts). A `currentNumber` change
+is a crypto-period event, and it is visible in a file every client already fetches. The exporter
+keeps the last seen number per table and counts changes.
+
+**Why estimate domain sizes:** FF1 is a permutation on the format's domain, and NIST SP 800-38G
+Rev. 1 makes a minimum domain of 10^6 a requirement. The appliance will encrypt a 5-digit domain
+without complaint. `format_domain_size()` computes `radix ** (length − preserved chars)` only
+when the policy carries enough attributes; unknown means no series, never a guess. The attribute
+names it recognises are the mock's vocabulary plus obvious spellings — the real schema is not
+public, which is why the parser stays forgiving.
+
+**Why lifecycle from the policy:** `<server version=…/>` names the running version; OpenText's
+release notes give end-of-maintenance dates. `lifecycle.py` holds the public ones and merges
+`exporter.support_end` from config, longest version prefix first.
 
 ## Collection
 

@@ -13,11 +13,24 @@ are rough: **S** ≈ a weekend, **M** ≈ a week of evenings, **L** ≈ a sustai
 Nothing here changes the project's rule: **read-only towards the appliance**, synthetic test
 data only, no production values.
 
+## Status
+
+| Item | Status |
+|---|---|
+| R1 key-version metrics | ✅ shipped — `feat: policy intelligence` |
+| R2 small-domain linter | ✅ shipped — `feat: policy intelligence` |
+| R3 silent-corruption probes | next |
+| R4 policy propagation lag | planned |
+| R5 eFPE awareness | ✅ shipped — `feat: policy intelligence` (detection; determinism exclusion lands with R3) |
+| R6–R9 coverage / SDM seam | planned |
+| R10–R11, R13–R16 | planned |
+| R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
+
 ---
 
 ## Horizon 1 — correctness of what we already monitor
 
-### R1. Parse `keyNumberTable` and export key-version metrics · **S**
+### R1. Parse `keyNumberTable` and export key-version metrics · **S** · ✅ shipped
 
 The live public demo policy at `voltage-pp-0000.dataprotection.voltage.com/policy/clientPolicy.xml`
 shows the real rotation mechanism: a `<keyNumberConfig>` block with named `<keyNumberTable
@@ -32,7 +45,7 @@ increment (crypto period changed outside change control) and on a key size below
 This is the single highest-value parser change: **key rotation becomes observable**, and it is
 observable from a file every client already downloads.
 
-### R2. Small-domain / weak-format linter · **S**
+### R2. Small-domain / weak-format linter · **S** · ✅ shipped
 
 NIST SP 800-38G Rev. 1 promotes the minimum FPE domain size from a recommendation to a
 **requirement of 10^6**, and it applies to FF1 — the mode Voltage uses — not just the broken
@@ -78,7 +91,7 @@ Ship: multi-target policy scraping with a fleet view —
 probe locations report different policy hashes for longer than a grace window. Needs the mock
 to grow a per-client-IP policy version so divergence is demonstrable in `docker compose`.
 
-### R5. eFPE awareness · **S**
+### R5. eFPE awareness · **S** · ✅ shipped
 
 Embedded FPE embeds a key identifier in the ciphertext, so the same plaintext produces
 different ciphertext per key epoch — which breaks equality joins. The vendor's answer is
@@ -179,7 +192,7 @@ add a **restore-drill freshness metric** — `voltage_identity_backup_restore_te
 fed by a periodic tested-restore job. Restore-testing the identity backup is the highest-value
 operational drill in this product, and nothing tracks whether it happened.
 
-### R12. Version and lifecycle awareness · **S**
+### R12. Version and lifecycle awareness · **S** · ✅ shipped
 
 The policy file reports the appliance version (`<server name="SecureDataAppliance"
 version="7.1.1.100286"/>`). OpenText publishes per-release support-end dates (DPP Foundation
