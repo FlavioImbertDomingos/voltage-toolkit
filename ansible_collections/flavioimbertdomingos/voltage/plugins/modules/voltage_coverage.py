@@ -79,12 +79,26 @@ report:
     errors: []
 """
 
+import json
 import os
+import traceback
 
-import yaml
+try:
+    import yaml
 
-from ansible.module_utils.basic import AnsibleModule
+    HAS_YAML = True
+    YAML_IMPORT_ERROR = None
+except ImportError:  # pragma: no cover - PyYAML is an Ansible dependency
+    HAS_YAML = False
+    YAML_IMPORT_ERROR = traceback.format_exc()
+
+from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 from ansible_collections.flavioimbertdomingos.voltage.plugins.module_utils import coverage as cov
+
+
+def _load_doc(text):
+    """YAML if PyYAML is present, else JSON (a data map may be written either way)."""
+    return yaml.safe_load(text) if HAS_YAML else json.loads(text)
 
 
 def _read(path):
@@ -105,14 +119,16 @@ def main():
         supports_check_mode=True,
     )
     p = module.params
+    if not HAS_YAML and not (p["data_map"].endswith(".json")):
+        module.fail_json(msg=missing_required_lib("PyYAML"), exception=YAML_IMPORT_ERROR)
     for key in ("classification_csv", "data_map", "desired_state"):
         if p.get(key) and not os.path.exists(p[key]):
             module.fail_json(msg="%s does not exist: %s" % (key, p[key]))
     try:
         feed, ferr = cov.parse_feed(_read(p["classification_csv"]))
-        entries, merr = cov.parse_data_map(yaml.safe_load(_read(p["data_map"])) or {})
-        desired = yaml.safe_load(_read(p["desired_state"])) if p.get("desired_state") else None
-    except (OSError, yaml.YAMLError) as exc:
+        entries, merr = cov.parse_data_map(_load_doc(_read(p["data_map"])) or {})
+        desired = _load_doc(_read(p["desired_state"])) if p.get("desired_state") else None
+    except Exception as exc:  # noqa: BLE001 - OSError, JSON or YAML parse errors
         module.fail_json(msg="cannot read coverage inputs: %s" % exc)
     identities = cov.identities_from_desired_state(desired) if desired is not None else None
     policy_formats = {str(d): [str(f) for f in (fs or [])] for d, fs in (p["policy_formats"] or {}).items()}
