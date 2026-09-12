@@ -113,6 +113,23 @@ class PolicyInfo:
         return [f["name"] for f in self.formats]
 
     @property
+    def config_fingerprint(self) -> str:
+        """sha256 of the *configuration* the policy expresses -- formats (with attributes), auth
+        methods, key tables, server version -- and not of the bytes. Two appliances in the same
+        district legitimately differ in hostnames and key-server URLs; they must not differ in
+        this. Used for fleet agreement (R4)."""
+        import json
+
+        canon = {
+            "version": self.version,
+            "server_version": self.server_version,
+            "formats": sorted((dict(sorted(f.items())) for f in self.formats), key=lambda f: f["name"]),
+            "auth_methods": sorted(self.auth_methods),
+            "key_tables": sorted((k.to_dict() for k in self.key_tables), key=lambda k: k["name"]),
+        }
+        return hashlib.sha256(json.dumps(canon, sort_keys=True, default=str).encode()).hexdigest()
+
+    @property
     def efpe_formats(self) -> list[str]:
         return [f["name"] for f in self.formats if is_efpe(f)]
 
@@ -122,6 +139,7 @@ class PolicyInfo:
             "district": self.district,
             "policy_id": self.policy_id,
             "server_version": self.server_version,
+            "config_fingerprint": self.config_fingerprint,
             "formats": self.formats,
             "auth_methods": self.auth_methods,
             "key_servers": self.key_servers,

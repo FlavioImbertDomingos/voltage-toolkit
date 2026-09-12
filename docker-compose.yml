@@ -17,6 +17,11 @@
 #      curl -X POST localhost:8800/mock/scenario/keyserver-down
 #      curl -X POST localhost:8800/mock/scenario/policy-changed
 #      curl -X POST localhost:8800/mock/scenario/healthy
+#
+#  A second "region" (voltage-dr) runs the same district. Make it diverge:
+#      curl -X POST localhost:8801/mock/scenario/diverged-keys   # same policy, different tokens -> pages
+#      curl -X POST localhost:8801/mock/scenario/key-rotated     # rotation reached DR only
+#      curl -X POST localhost:8801/mock/scenario/healthy
 # ------------------------------------------------------------------
 
 services:
@@ -41,6 +46,28 @@ services:
       timeout: 3s
       retries: 20
 
+  # Same district, second region. Identical unless you tell it not to be.
+  voltage-dr:
+    image: voltage-toolkit/mock-voltage:latest
+    container_name: voltage-dr
+    environment:
+      MOCK_SCENARIO: ${MOCK_DR_SCENARIO:-healthy}
+      MOCK_KEY_HOST: voltage-dr:8443
+      MOCK_SHARED_SECRET: ${VOLTAGE_SHARED_SECRET:-probe-secret}
+      MOCK_PASSWORD: ${VOLTAGE_PASSWORD:-changeme}
+      MOCK_TLS_CERT_DAYS: 400
+    ports:
+      - "8801:8800"
+      - "8444:8443"
+    depends_on:
+      voltage:
+        condition: service_started   # only so the image is built once, by the `voltage` service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8800/mock/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   voltage-exporter:
     build: ./exporter
     image: voltage-toolkit/voltage-exporter:latest
@@ -56,6 +83,8 @@ services:
       - "9743:9743"
     depends_on:
       voltage:
+        condition: service_healthy
+      voltage-dr:
         condition: service_healthy
     restart: unless-stopped
 

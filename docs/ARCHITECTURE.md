@@ -17,6 +17,7 @@ config.yml ─► voltage_exporter.config.load()
                  │
                  ▼
            metrics.apply(result)  ──► prometheus_client Gauges / Counters / Histograms
+           fleet.evaluate(all results) ──► metrics.apply_fleet()   (targets sharing `fleet:` must agree)
                  ├─ policy.format_domain_size() / is_efpe()   per format  (R2, R5)
                  ├─ key tables → current number, rotation counter, key size  (R1)
                  └─ lifecycle.support_end(server_version)       (R12; built-in table + config overrides)
@@ -43,6 +44,18 @@ doubly-protected value still reversible (ETL does that by accident), and is a to
 one format unreadable under another (the whole point of formats being separate key spaces).
 The mock has scenarios for the last two (`format-leak`, `nondeterministic`) precisely because
 they leave every other metric green.
+
+**Why compare across targets:** the stateless design makes two appliances in one district
+cheap to keep identical — no vault to replicate — and that is exactly why nobody verifies it.
+Two things drift silently: policy propagates lazily per node (Vertica: *"Policy on other nodes
+will be refreshed the next time a Voltage operation is run on them"*), and a DR region built
+from its own district instead of the restored backup has the same policy and a different master
+secret, so it protects the same value to a different token while round-tripping perfectly on its
+own. `fleet.evaluate()` compares, per fleet, a *configuration* fingerprint of the policy (not the
+bytes — hostnames legitimately differ), each key table's `currentNumber`, the appliance version,
+and the SHA-256 of each probe's token. One assertion covers master-secret parity, district
+naming, token-table parity and format parity. It runs after every cycle, across all targets,
+which is why the loop collects results before applying them.
 
 **Why hash the policy:** clientPolicy.xml is the only unauthenticated view of the district's
 configuration. A hash change is either a change window or an incident.

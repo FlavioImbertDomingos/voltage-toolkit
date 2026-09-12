@@ -17,6 +17,8 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 from . import __version__
 from .config import Config
+from .fleet import FleetCheck
+from .fleet import evaluate as evaluate_fleet
 from .lifecycle import split_version, support_end
 from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
 from .probes import TargetResult, run_target
@@ -102,6 +104,19 @@ integrity_ok = Gauge(
 integrity_total = Counter(
     f"{NS}_integrity_checks", "Integrity checks run", ["target", "check", "result"]
 )  # result = pass | fail | error
+
+# ---- fleet agreement (R4, R15): several vantage points must give the same answers
+fleet_ok = Gauge(
+    f"{NS}_fleet_agreement",
+    "1 if every member of the fleet agrees (check = policy | version | key_table | token; key = table or format)",
+    ["fleet", "check", "key"],
+)
+fleet_members = Gauge(f"{NS}_fleet_members", "Members that reported for the check", ["fleet", "check", "key"])
+fleet_odd = Gauge(
+    f"{NS}_fleet_member_diverged",
+    "1 if this target disagrees with the fleet majority for the check",
+    ["fleet", "check", "key", "target"],
+)
 
 # ---- tls / key servers
 cert_expiry = Gauge(f"{NS}_certificate_expiry_timestamp_seconds", "Certificate notAfter", ["target", "host", "subject"])
@@ -223,13 +238,29 @@ def apply(result: TargetResult) -> None:
     last_run.labels(t).set(time.time())
 
 
+def apply_fleet(checks: list[FleetCheck], all_targets: list[str] | None = None) -> None:
+    for c in checks:
+        fleet_members.labels(c.fleet, c.check, c.key).set(float(c.members))
+        if c.ok is None:
+            continue
+        fleet_ok.labels(c.fleet, c.check, c.key).set(1.0 if c.ok else 0.0)
+        for t in all_targets or []:
+            fleet_odd.labels(c.fleet, c.check, c.key, t).set(1.0 if t in c.odd_ones else 0.0)
+        for t in c.odd_ones:
+            fleet_odd.labels(c.fleet, c.check, c.key, t).set(1.0)
+        if not c.ok:
+            log.error("[fleet %s] %s %s: %s", c.fleet, c.check, c.key or "", c.detail)
+
+
 def probe_loop(config: Config, stop: threading.Event) -> None:
     configure(config)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(config.targets)))) as pool:
         while not stop.is_set():
             started = time.perf_counter()
-            for res in pool.map(run_target, config.targets):
+            results = list(pool.map(run_target, config.targets))
+            for res in results:
                 apply(res)
+            apply_fleet(evaluate_fleet(results), [t.name for t in config.targets if t.fleet])
             cycles.inc()
             elapsed = time.perf_counter() - started
             log.info("probe cycle done in %.2fs (%d target(s))", elapsed, len(config.targets))

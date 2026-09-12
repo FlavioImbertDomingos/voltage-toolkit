@@ -24,6 +24,8 @@
           - {format: CC-ST-64O, sample: "4111111111111111", tokenization: true}
         extra_tls_hosts: ["voltage-ks-0000.demo.bank:443"] # additional certs to watch
         labels: {site: phx}
+        fleet: prod                                        # targets sharing a fleet name must agree:
+                                                           #   same policy hash, same key numbers, same tokens
         integrity:                                         # silent-corruption probes (all default true)
           determinism: true                                #   protect(x) == protect(x)  (skipped for eFPE)
           double_protect: true                             #   access(protect(protect(x))) == protect(x)
@@ -75,6 +77,7 @@ class Target:
     probes: list[ProbeSpec] = field(default_factory=list)
     extra_tls_hosts: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
+    fleet: str = ""  # targets with the same fleet name are expected to agree (R4 / R15)
     integrity_determinism: bool = True
     integrity_double_protect: bool = True
     integrity_format_isolation: bool = True
@@ -169,6 +172,7 @@ def _target(entry: dict) -> Target:
         probes=probes,
         extra_tls_hosts=[str(h) for h in entry.get("extra_tls_hosts") or []],
         labels={str(k): str(v) for k, v in (entry.get("labels") or {}).items()},
+        fleet=str(entry.get("fleet") or ""),
         integrity_determinism=bool(integ.get("determinism", True)),
         integrity_double_protect=bool(integ.get("double_protect", True)),
         integrity_format_isolation=bool(integ.get("format_isolation", True)),

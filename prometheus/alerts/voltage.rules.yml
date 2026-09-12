@@ -198,3 +198,38 @@ groups:
         annotations:
           summary: "{{ $labels.target }} runs {{ $labels.version }}, out of vendor maintenance"
           description: "{{ $labels.release }} maintenance ended {{ with printf `-voltage:support_days_remaining{target=\"%s\",version=\"%s\"}` $labels.target $labels.version | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }} days ago. No security fixes; a PCI DSS 6.3.3 finding waiting to happen."
+
+  # Several vantage points on the same district must give the same answers (R4, R15).
+  # Targets opt in with `fleet: <name>` in the exporter config.
+  - name: voltage-fleet
+    rules:
+      - alert: VoltageRegionDivergence
+        expr: voltage_fleet_agreement{check="token"} == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "DR DIVERGENCE: fleet {{ $labels.fleet }} protects {{ $labels.key }} differently on {{ with printf `voltage_fleet_member_diverged{fleet=\"%s\",check=\"token\",key=\"%s\"} == 1` $labels.fleet $labels.key | query }}{{ range . }}{{ .Labels.target }} {{ end }}{{ end }}"
+          description: "The same synthetic value protects to different tokens on different members of the fleet. Same policy, same formats, different master secret or token tables -- a region built from its own district rather than restored from the shared backup. Every member round-trips fine on its own, so nothing else alerts. If this fleet fails over, it will write tokens the other side cannot detokenize. Do not fail over until fixed."
+
+      - alert: VoltagePolicyFleetDivergent
+        expr: voltage_fleet_agreement{check="policy"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Fleet {{ $labels.fleet }}: members serve different policy configuration"
+          description: "Formats, auth methods, key tables or version differ between members ({{ with printf `voltage_fleet_member_diverged{fleet=\"%s\",check=\"policy\"} == 1` $labels.fleet | query }}{{ range . }}{{ .Labels.target }} {{ end }}{{ end }}are the odd ones). Policy propagates lazily and per node, so a few minutes after a change is normal -- 10 minutes is not. Clients on different members are now enforcing different policy."
+
+      - alert: VoltageFleetKeyTableSkew
+        expr: voltage_fleet_agreement{check="key_table"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Fleet {{ $labels.fleet }}: key table {{ $labels.key }} is at different currentNumber on different members"
+          description: "A rotation reached some members and not others. eFPE ciphertext produced on the rotated side embeds a key number the others do not have yet. Finish the rotation everywhere or roll it back; do not fail over in between."
+
+      - alert: VoltageFleetVersionSkew
+        expr: voltage_fleet_agreement{check="version"} == 0
+        for: 30m
+        labels: {severity: info}
+        annotations:
+          summary: "Fleet {{ $labels.fleet }}: members run different appliance versions"
+          description: "Fine during a rolling upgrade; not fine as a steady state. SST3 (CE 24.4) in particular changes the tokenization engine."

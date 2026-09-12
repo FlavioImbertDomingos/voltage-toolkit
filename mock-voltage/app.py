@@ -25,6 +25,7 @@ Scenarios (switch at runtime: `curl -X POST localhost:8800/mock/scenario/slow`):
   weak-key        key table PII current key drops to 128-bit
   format-leak     access under the wrong format returns the plaintext -- format isolation broken
   nondeterministic protect(x) != protect(x); access still recovers x -- referential integrity broken
+  diverged-keys   different master secret: a DR region that was not restored from backup
   cert-expiring   (startup only) HTTPS cert valid for 7 days -- MOCK_TLS_CERT_DAYS=7
 """
 
@@ -129,6 +130,7 @@ SCENARIOS = {
     "weak-key": "Key table PII's current key is 128-bit.",
     "format-leak": "access() under the *wrong* format returns the original plaintext (formats share a key).",
     "nondeterministic": "protect() returns a different token every call (round-trip still works).",
+    "diverged-keys": "This appliance protects with a different master secret: same policy, different tokens.",
 }
 _state = {
     "scenario": os.environ.get("MOCK_SCENARIO", "healthy"),
@@ -147,8 +149,15 @@ def scenario() -> str:
 _SECRET = os.environ.get("MOCK_FPE_KEY", "not-a-real-key").encode()
 
 
+def _secret() -> bytes:
+    """The district master secret, as far as this toy is concerned. The diverged-keys
+    scenario swaps it: a 'DR region' built from its own district instead of a restored
+    backup looks exactly like this -- same policy, same formats, different answers."""
+    return _SECRET + b":diverged" if scenario() == "diverged-keys" else _SECRET
+
+
 def _perm(alphabet: str, salt: str) -> dict[str, str]:
-    seed = int.from_bytes(hashlib.sha256(_SECRET + salt.encode()).digest()[:8], "big")
+    seed = int.from_bytes(hashlib.sha256(_secret() + salt.encode()).digest()[:8], "big")
     chars = list(alphabet)
     random.Random(seed).shuffle(chars)
     return dict(zip(alphabet, chars, strict=True))
@@ -217,7 +226,7 @@ def tokenize(value: str, fmt: str, reverse: bool = False) -> str:
         # tokens are stored in memory; a real SST is stateless via a token table
         return _TOKENS.get(value, value)
     digits = re.sub(r"\D", "", value)
-    tok = hashlib.sha256(_SECRET + fmt.encode() + value.encode()).hexdigest()[
+    tok = hashlib.sha256(_secret() + fmt.encode() + value.encode()).hexdigest()[
         : max(4, len(digits) - 4)
     ]
     token = "".join(str(int(c, 16) % 10) for c in tok) + digits[-4:]

@@ -94,6 +94,16 @@ jobs:
           echo "$M" | grep -q 'voltage_policy_up{target="demo-prod"} 1.0'
           echo "$M" | grep -q 'voltage_keyserver_up{target="demo-prod",url="https://voltage:8443/vibekeys/"} 1.0'
           echo "$M" | grep -q '^voltage_certificate_expiry_timestamp_seconds'
+      - name: Fleet agrees, then DR diverges
+        run: |
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q 'voltage_fleet_agreement{check="token",fleet="demo",key="CC"} 1.0'
+          echo "$M" | grep -q 'voltage_fleet_agreement{check="policy",fleet="demo",key=""} 1.0'
+          curl -sf -X POST http://localhost:8801/mock/scenario/diverged-keys
+          sleep 20
+          curl -sf http://localhost:9743/metrics | grep -q 'voltage_fleet_agreement{check="token",fleet="demo",key="CC"} 0.0'
+          curl -sf http://localhost:9743/metrics | grep -q 'voltage_fleet_member_diverged{check="token",fleet="demo",key="CC",target="demo-dr"} 1.0'
+          curl -sf -X POST http://localhost:8801/mock/scenario/healthy
       - name: Scenario is reflected
         run: |
           curl -sf -X POST http://localhost:8800/mock/scenario/auth-fail

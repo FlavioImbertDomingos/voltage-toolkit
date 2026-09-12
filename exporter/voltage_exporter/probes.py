@@ -20,6 +20,7 @@ data, and the exporter never logs the protected value.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import time
@@ -40,6 +41,7 @@ class TokenizeResult:
     access_seconds: float | None = None
     roundtrip_ok: bool | None = None
     format_preserved: bool | None = None
+    token_sha256: str = ""  # hash of the protected value, for cross-target equivalence; the value itself is never kept
     error: str = ""
     error_kind: str = ""  # auth | http | timeout | connection | mismatch | other
 
@@ -109,6 +111,7 @@ def run_tokenize(client: VoltageClient, spec: ProbeSpec) -> TokenizeResult:
             res.error, res.error_kind = "protect returned the input unchanged", "mismatch"
             return res
         res.format_preserved = _same_shape(spec.sample, token) if not spec.tokenization else len(token) > 0
+        res.token_sha256 = hashlib.sha256(token.encode()).hexdigest()
         a = client.access(spec.format, token, spec.identity)
         res.access_seconds = a.seconds
         res.roundtrip_ok = str(a.value) == spec.sample

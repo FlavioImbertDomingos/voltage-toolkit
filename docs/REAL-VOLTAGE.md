@@ -35,6 +35,16 @@ off under `integrity:`. The format-isolation check will show up in the appliance
 access attempts under the wrong format from the probe identity — tell whoever reads those logs
 first, because it looks exactly like what it is testing for.
 
+## Two regions, one district
+
+Give every target that is supposed to be the same district the same `fleet:` name and the same
+probe samples. The exporter then asserts they agree — policy configuration, key numbers, and
+that `protect(sample)` yields the same token everywhere. If `VoltageRegionDivergence` fires
+before you have ever failed over, you have just been saved a very bad afternoon: the DR side
+has a different master secret or token table, and the fix is a restore from the shared
+backup, not a failover test. Use synthetic samples only, as always; tokens are compared by
+hash and never exported.
+
 ## Verify before you deploy
 
 ```bash

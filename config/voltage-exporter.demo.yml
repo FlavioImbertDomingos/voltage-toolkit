@@ -20,6 +20,26 @@ targets:
       - {format: AlphaNumeric, sample: "Order7781X"}
       - {format: CC-ST-64O, sample: "5500000000000004", tokenization: true}
     labels: {site: demo}
+    fleet: demo                  # must agree with demo-dr: policy, key tables, tokens
+
+  # The same district in a second region. Must give the same answers as demo-prod.
+  - name: demo-dr
+    policy_url: https://voltage-dr:8443/policy/clientPolicy.xml
+    ws_url: https://voltage-dr:8443
+    api: rest
+    identity: probe@demo.bank
+    auth:
+      method: shared_secret
+      secret_env: VOLTAGE_SHARED_SECRET
+    verify_tls: false
+    timeout_seconds: 5
+    probes:
+      - {format: CC,        sample: "4111111111111111"}
+      - {format: SSN,       sample: "123-45-6789"}
+      - {format: AlphaNumeric, sample: "Order7781X"}
+      - {format: CC-ST-64O, sample: "5500000000000004", tokenization: true}
+    labels: {site: demo-dr}
+    fleet: demo
 
   # The same appliance over SOAP, so both code paths stay honest.
   - name: demo-prod-soap
