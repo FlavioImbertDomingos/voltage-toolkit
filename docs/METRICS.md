@@ -51,6 +51,19 @@ encrypts 5 digits — 10^5, *under* it. The appliance will encrypt both without 
 | `voltage_tokenize_roundtrip_ok` | gauge | `format` | 1 if `access(protect(x)) == x` |
 | `voltage_tokenize_format_preserved` | gauge | `format` | 1 if the token kept the sample's length and character classes (FPE) |
 
+## Integrity probes — the failures that produce no error
+
+Each of these returns HTTP 200 and plausible-looking data on a real appliance. The ordinary
+round-trip probe stays green through all of them.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_integrity_ok` | gauge | `check`, `format`, `against` | 1 if the check passed. `check` ∈ `determinism` (protect(x) == protect(x); **skipped for eFPE**), `double_protect` (access(protect(protect(x))) == protect(x)), `format_isolation` (a token made under `format`, accessed under `against`, must not yield the plaintext — an error counts as isolation working) |
+| `voltage_integrity_checks_total` | counter | `check`, `result` (pass / fail / error) | Checks run; `error` = could not evaluate (e.g. protect itself failed) |
+
+Configure per target under `integrity:` — each check can be turned off, and `isolation_pairs`
+overrides the default pairing (each FPE probe against the next one, round-robin).
+
 ## TLS and key servers
 
 | Metric | Type | Labels | Meaning |

@@ -303,3 +303,129 @@ def test_efpe_format_round_trips_like_fpe(mock_server, healthy):
     tgt = target_for(mock_server, probes=[ProbeSpec("CC-EFPE", "4111111111111111")])
     r = run_target(tgt)
     assert r.tokenize[0].ok and r.tokenize[0].roundtrip_ok and r.tokenize[0].format_preserved
+
+
+# --------------------------------------------------------------------- integrity probes (R3)
+def _integrity(r, check, fmt=None):
+    return [x for x in r.integrity if x.check == check and (fmt is None or x.format == fmt)]
+
+
+def test_integrity_probes_pass_on_healthy_mock(mock_server, healthy):
+    from voltage_exporter.config import ProbeSpec
+
+    tgt = target_for(
+        mock_server,
+        probes=[
+            ProbeSpec("CC", "4111111111111111"),
+            ProbeSpec("SSN", "123456789"),
+            ProbeSpec("CC-EFPE", "4111111111111111"),
+            ProbeSpec("CC-ST-64O", "5500000000000004", tokenization=True),
+        ],
+    )
+    r = run_target(tgt)
+    det = _integrity(r, "determinism")
+    assert {x.format for x in det} == {"CC", "SSN"}  # eFPE excluded, tokenization excluded
+    assert all(x.ok for x in det)
+    dbl = _integrity(r, "double_protect")
+    assert {x.format for x in dbl} == {"CC", "SSN", "CC-EFPE"} and all(x.ok for x in dbl)
+    iso = _integrity(r, "format_isolation")
+    # default pairing: each FPE probe against the next one, round-robin
+    assert [(x.format, x.against) for x in iso] == [("CC", "SSN"), ("SSN", "CC-EFPE"), ("CC-EFPE", "CC")]
+    assert all(x.ok for x in iso)
+
+
+def test_integrity_detects_format_leak(mock_server, healthy):
+    from voltage_exporter.config import ProbeSpec
+
+    _, _, mod = mock_server
+    tgt = target_for(mock_server, probes=[ProbeSpec("CC", "4111111111111111"), ProbeSpec("SSN", "123456789")])
+    mod._state["scenario"] = "format-leak"
+    r = run_target(tgt)
+    iso = _integrity(r, "format_isolation")
+    assert iso and all(x.ok is False for x in iso)
+    assert "returned the plaintext" in iso[0].detail
+    # the ordinary round-trip probe is *green* in this scenario -- that's the whole point
+    assert all(t.ok for t in r.tokenize)
+
+
+def test_integrity_detects_nondeterminism(mock_server, healthy):
+    from voltage_exporter.config import ProbeSpec
+
+    _, _, mod = mock_server
+    probes = [ProbeSpec("CC", "4111111111111111"), ProbeSpec("CC-EFPE", "4111111111111111")]
+    tgt = target_for(mock_server, probes=probes)
+    mod._state["scenario"] = "nondeterministic"
+    r = run_target(tgt)
+    det = _integrity(r, "determinism")
+    assert [x.format for x in det] == ["CC"] and det[0].ok is False
+    assert all(t.ok for t in r.tokenize)  # round-trip still passes: silent
+
+
+def test_efpe_changes_ciphertext_on_rotation_but_is_excluded_from_determinism(mock_server, healthy):
+    from voltage_exporter.client import VoltageClient
+    from voltage_exporter.config import ProbeSpec
+
+    _, _, mod = mock_server
+    tgt = target_for(mock_server, probes=[ProbeSpec("CC-EFPE", "4111111111111111")])
+    c = VoltageClient(tgt)
+    before = str(c.protect("CC-EFPE", "4111111111111111").value)
+    mod._state["scenario"] = "key-rotated"
+    after = str(c.protect("CC-EFPE", "4111111111111111").value)
+    assert before != after  # same plaintext, new key epoch -> different ciphertext
+    assert str(c.access("CC-EFPE", before).value) == "4111111111111111"  # old ciphertext still decrypts
+    r = run_target(tgt)
+    assert _integrity(r, "determinism") == []  # excluded because the policy marks it eFPE
+    assert _integrity(r, "double_protect", "CC-EFPE")[0].ok
+
+
+def test_integrity_config_flags_and_pairs(mock_server, healthy, tmp_path):
+    from voltage_exporter.config import ProbeSpec
+
+    tgt = target_for(
+        mock_server,
+        probes=[ProbeSpec("CC", "4111111111111111"), ProbeSpec("SSN", "123456789")],
+        integrity_determinism=False,
+        integrity_double_protect=False,
+        isolation_pairs=[("SSN", "CC"), ("CC", "NOPE")],
+    )
+    r = run_target(tgt)
+    assert _integrity(r, "determinism") == [] and _integrity(r, "double_protect") == []
+    iso = _integrity(r, "format_isolation")
+    assert [(x.format, x.against, x.ok) for x in iso] == [("SSN", "CC", True), ("CC", "NOPE", True)]
+    # config loader
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(
+        "targets:\n  - name: t\n    policy_url: https://x/policy/clientPolicy.xml\n    identity: i\n"
+        "    auth: {secret: s}\n    integrity: {determinism: false, isolation_pairs: [[CC, SSN]]}\n"
+    )
+    t = config.load(cfg).targets[0]
+    assert t.integrity_determinism is False and t.integrity_double_protect is True
+    assert t.isolation_pairs == [("CC", "SSN")]
+    cfg.write_text(
+        "targets:\n  - name: t\n    policy_url: https://x/policy/clientPolicy.xml\n    identity: i\n"
+        "    auth: {secret: s}\n    integrity: {isolation_pairs: [CC]}\n"
+    )
+    with pytest.raises(config.ConfigError):
+        config.load(cfg)
+
+
+def test_integrity_metrics(mock_server, healthy):
+    from prometheus_client import REGISTRY
+
+    from voltage_exporter.config import ProbeSpec
+
+    _, _, mod = mock_server
+    probes = [ProbeSpec("CC", "4111111111111111"), ProbeSpec("SSN", "123456789")]
+    tgt = target_for(mock_server, name="integ", probes=probes)
+    metrics.apply(run_target(tgt))
+
+    def g(**lb):
+        return REGISTRY.get_sample_value("voltage_integrity_ok", {"target": "integ", **lb})
+
+    assert g(check="determinism", format="CC", against="") == 1.0
+    assert g(check="format_isolation", format="CC", against="SSN") == 1.0
+    mod._state["scenario"] = "format-leak"
+    metrics.apply(run_target(tgt))
+    assert g(check="format_isolation", format="CC", against="SSN") == 0.0
+    fails = {"target": "integ", "check": "format_isolation", "result": "fail"}
+    assert REGISTRY.get_sample_value("voltage_integrity_checks_total", fails) >= 1

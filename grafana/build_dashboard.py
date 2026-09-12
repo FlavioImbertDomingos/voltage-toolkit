@@ -137,16 +137,16 @@ panels = [
         f"min(voltage:certificate_days_until_expiry{{{SEL}}})",
         0,
         5,
-        w=6,
+        w=4,
         unit="d",
         decimals=0,
         thr=thresholds(("red", None), ("orange", 7), ("yellow", 30), ("green", 90)),
     ),  # fmt: skip
-    stat("Formats in policy", f"sum(voltage_policy_formats{{{SEL}}})", 6, 5, w=4),
+    stat("Formats in policy", f"sum(voltage_policy_formats{{{SEL}}})", 4, 5, w=4),
     stat(
         "Policy changes (24h)",
         f"sum(increase(voltage_policy_changes_total{{{SEL}}}[24h]))",
-        10,
+        8,
         5,
         w=4,
         thr=thresholds(("green", None), ("orange", 1)),
@@ -154,7 +154,7 @@ panels = [
     stat(
         "Probe cycle",
         f"max(voltage_probe_cycle_seconds{{{SEL}}})",
-        14,
+        12,
         5,
         w=4,
         unit="s",
@@ -163,13 +163,14 @@ panels = [
     stat(
         "Last probe",
         f"time() - max(voltage_probe_last_run_timestamp_seconds{{{SEL}}})",
-        18,
+        16,
         5,
-        w=6,
+        w=4,
         unit="s",
         decimals=0,
         thr=thresholds(("green", None), ("orange", 120), ("red", 300)),
     ),  # fmt: skip
+    stat("Silent-corruption checks", f"min(voltage_integrity_ok{{{SEL}}})", 20, 5, mappings=OKBAD),
     row("Latency & errors", 9),
     timeseries(
         "protect latency p50 / p95 / p99",

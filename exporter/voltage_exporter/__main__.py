@@ -72,6 +72,11 @@ def main(argv: list[str] | None = None) -> int:
                 lat = f" protect={tk.protect_seconds:.3f}s access={tk.access_seconds:.3f}s" if tk.ok else ""
                 print(f"[{t.name}] tokenize {tk.spec.format}: {status}{lat}")
                 rc = rc or (0 if tk.ok else 1)
+            for ir in r.integrity:
+                state = "ok" if ir.ok else ("FAIL" if ir.ok is False else "n/a")
+                tgt = f"{ir.format}->{ir.against}" if ir.against else ir.format
+                print(f"[{t.name}] integrity {ir.check} {tgt}: {state}{(' ' + ir.detail) if ir.detail else ''}")
+                rc = rc or (1 if ir.ok is False else 0)
             for c in r.tls:
                 days = int((c.not_after - time.time()) / 86400) if c.ok else 0
                 print(f"[{t.name}] tls {c.host}:{c.port}: " + (f"ok, expires {days}d" if c.ok else f"FAIL {c.error}"))

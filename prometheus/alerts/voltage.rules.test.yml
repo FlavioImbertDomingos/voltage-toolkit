@@ -140,3 +140,44 @@ tests:
             exp_annotations:
               summary: "legacy runs 6.9.0, out of vendor maintenance"
               description: "6.9 maintenance ended 10 days ago. No security fixes; a PCI DSS 6.3.3 finding waiting to happen."
+
+  # --- integrity (silent-corruption) rules
+  - interval: 15s
+    input_series:
+      - series: 'voltage_integrity_ok{target="prod", check="format_isolation", format="CC", against="SSN"}'
+        values: "1 1 0 0 0"
+      - series: 'voltage_integrity_ok{target="prod", check="determinism", format="CC", against=""}'
+        values: "1 0 0 0 0"
+      - series: 'voltage_integrity_ok{target="prod", check="double_protect", format="SSN", against=""}'
+        values: "0x40"
+      - series: 'voltage_tokenize_success{target="prod", format="CC", identity="probe"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 45s
+        alertname: VoltageFormatIsolationBroken
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod, check: format_isolation, format: CC, against: SSN}
+            exp_annotations:
+              summary: "DATA EXPOSURE: a CC token detokenizes under format SSN (prod)"
+              description: "access() under the wrong format returned the original plaintext. Formats are supposed to be separate key spaces; this means two formats share a key, or an identity is over-authorized. Any application allowed to use SSN can read CC data. Treat as an incident."
+      - eval_time: 30s
+        alertname: VoltageNonDeterministic
+        exp_alerts:
+          - exp_labels: {severity: critical, target: prod, check: determinism, format: CC}
+            exp_annotations:
+              summary: "REFERENTIAL INTEGRITY: CC protects the same value differently each time (prod)"
+              description: "protect(x) != protect(x). Joins across tables on this column silently drop rows and lookups by protected value miss. Round-trip probes still pass, so nothing else will alert. Causes: a rotation in progress without eFPE, per-call tweaks, or a client library bug. (eFPE formats are excluded from this check on purpose.)"
+      - eval_time: 2m
+        alertname: VoltageDoubleProtectCorrupts
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: VoltageDoubleProtectCorrupts
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod, check: double_protect, format: SSN}
+            exp_annotations:
+              summary: "SSN on prod: protecting an already-protected value is not reversible"
+              description: "access(protect(protect(x))) != protect(x). An ETL step that protects a column twice -- which happens -- would corrupt it without any error. Check format definition (checksum / preserved-character rules) and client library version."
+      # the ordinary tokenization alert stays quiet: that is the point of R3
+      - eval_time: 6m
+        alertname: VoltageTokenizationFailing
+        exp_alerts: []

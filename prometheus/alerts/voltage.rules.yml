@@ -79,6 +79,29 @@ groups:
           summary: "DATA INTEGRITY: access(protect(x)) != x on {{ $labels.target }} ({{ $labels.format }})"
           description: "Detokenizing returned a different value than was tokenized. Stop and investigate key/district configuration before anything writes tokens to a database."
 
+      # --- the silent ones: HTTP 200, plausible data, wrong (roadmap R3)
+      - alert: VoltageFormatIsolationBroken
+        expr: voltage_integrity_ok{check="format_isolation"} == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "DATA EXPOSURE: a {{ $labels.format }} token detokenizes under format {{ $labels.against }} ({{ $labels.target }})"
+          description: "access() under the wrong format returned the original plaintext. Formats are supposed to be separate key spaces; this means two formats share a key, or an identity is over-authorized. Any application allowed to use {{ $labels.against }} can read {{ $labels.format }} data. Treat as an incident."
+
+      - alert: VoltageNonDeterministic
+        expr: voltage_integrity_ok{check="determinism"} == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "REFERENTIAL INTEGRITY: {{ $labels.format }} protects the same value differently each time ({{ $labels.target }})"
+          description: "protect(x) != protect(x). Joins across tables on this column silently drop rows and lookups by protected value miss. Round-trip probes still pass, so nothing else will alert. Causes: a rotation in progress without eFPE, per-call tweaks, or a client library bug. (eFPE formats are excluded from this check on purpose.)"
+
+      - alert: VoltageDoubleProtectCorrupts
+        expr: voltage_integrity_ok{check="double_protect"} == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.format }} on {{ $labels.target }}: protecting an already-protected value is not reversible"
+          description: "access(protect(protect(x))) != protect(x). An ETL step that protects a column twice -- which happens -- would corrupt it without any error. Check format definition (checksum / preserved-character rules) and client library version."
+
       - alert: VoltageErrorRateHigh
         expr: voltage:tokenize_error_ratio_10m > 0.05
         for: 5m

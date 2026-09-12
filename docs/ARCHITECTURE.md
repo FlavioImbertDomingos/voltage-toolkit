@@ -10,6 +10,8 @@ config.yml ─► voltage_exporter.config.load()
                  ├─ client.fetch_policy()  ──► policy.parse_policy()   (formats, auth, key servers, sha256,
                  │                                                       key tables, server version, format attrs)
                  ├─ for each probe: client.protect() ─► client.access() ─► compare
+                 ├─ probes.run_integrity(): determinism, double-protect, format-isolation
+                 │     (skips determinism for formats the policy marks eFPE)
                  ├─ client.certificate() for policy host, WS host, key servers, extras
                  └─ GET each key server URL
                  │
@@ -30,6 +32,17 @@ Prometheus instances (or engineers with curl) scrape `/metrics`.
 **Why protect *and* access:** protect alone proves the API is up. access proves the *keys* are
 right — a district pointed at the wrong key server can happily hand out tokens nobody can
 reverse. `voltage_tokenize_roundtrip_ok` is the metric that catches that.
+
+**Why the integrity probes:** the dangerous Voltage failures are not crashes. Vertica's own
+docs list three that return wrong data with no error: decrypting under a mismatched format
+"produces incorrect plaintext", accessing an unencrypted column "returns scrambled values", and
+the `auto` date format yields values that fail to cast downstream. A round-trip probe cannot
+see any of them — it asks one format one question. So `run_integrity()` asks the questions that
+distinguish *working* from *correct*: is protection deterministic (joins depend on it), is a
+doubly-protected value still reversible (ETL does that by accident), and is a token made under
+one format unreadable under another (the whole point of formats being separate key spaces).
+The mock has scenarios for the last two (`format-leak`, `nondeterministic`) precisely because
+they leave every other metric green.
 
 **Why hash the policy:** clientPolicy.xml is the only unauthenticated view of the district's
 configuration. A hash change is either a change window or an incident.
