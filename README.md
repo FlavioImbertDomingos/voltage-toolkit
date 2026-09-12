@@ -181,6 +181,12 @@ voltage-toolkit/
 - Read-only towards the appliance, always: the exporter and the modules only ever call the
   policy download and the protect/access operations you'd use from any application.
 
+## Roadmap
+
+Where this goes next — coverage metrics against a classification feed, key-rotation and
+small-domain checks parsed straight from the policy, silent-corruption probes, and the
+SDM / discovery seam nobody monitors: **[ROADMAP.md](ROADMAP.md)**.
+
 ## Sister projects
 
 - [luna-exporter](https://github.com/FlavioImbertDomingos/luna-exporter) — Prometheus monitoring for Thales Luna HSMs
