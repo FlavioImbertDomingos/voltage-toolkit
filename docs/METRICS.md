@@ -15,6 +15,29 @@ All metrics carry `target` (the name you gave the district in config).
 | `voltage_policy_changes_total` | counter | — | Policy content hash changed since exporter start |
 | `voltage_policy_last_change_timestamp_seconds` | gauge | — | When it last changed |
 
+## What the policy says about the cryptography
+
+All from `clientPolicy.xml` alone — no protect/access calls, so these work with a read-only,
+unauthenticated probe. The policy schema is not public; the parser is forgiving about attribute
+names (see `policy.py`) and emits nothing rather than guessing when the file does not say enough.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_key_table_current_number` | gauge | `table` | `currentNumber` of a `<keyNumberTable>` — **this increments on key rotation** |
+| `voltage_key_table_versions` | gauge | `table` | Key versions listed in the table (old numbers stay so old ciphertext still decrypts) |
+| `voltage_key_info` | gauge | `table`, `number`, `algorithm`, `key_size` | One series per key version, always 1 |
+| `voltage_key_current_size_bits` | gauge | `table` | Key size of the current key (0 if the policy does not say) |
+| `voltage_key_rotations_total` | counter | `table` | Times `currentNumber` changed since exporter start |
+| `voltage_format_domain_size` | gauge | `format` | Estimated FPE domain: `radix ** (length − preserved chars)`, minimum length if a range; only when computable |
+| `voltage_format_below_minimum_domain` | gauge | `format` | 1 if the domain is under NIST SP 800-38G Rev. 1's 10^6 floor for FF1 |
+| `voltage_policy_format_efpe` | gauge | `format` | 1 for embedded-FPE formats — ciphertext differs per key epoch, so equality joins on the column are unsafe |
+| `voltage_appliance_version_info` | gauge | `version`, `major`, `minor` | Appliance version from `<server version=…/>`, always 1 |
+| `voltage_support_end_timestamp_seconds` | gauge | `version`, `release` | End of vendor maintenance for that version — only for versions in the built-in table or `exporter.support_end` in config |
+
+Why the domain size matters: a 16-digit card format that preserves BIN(6) and last 4 encrypts
+6 digits — a domain of exactly 10^6, right at the floor. An SSN format that keeps the last 4
+encrypts 5 digits — 10^5, *under* it. The appliance will encrypt both without complaint.
+
 ## Tokenization probes (`protect` then `access`)
 
 | Metric | Type | Labels | Meaning |
@@ -55,6 +78,7 @@ and `extra_tls_hosts` from config.
 |---|---|
 | `voltage:tokenize_error_ratio_10m` | failures / all probes over 10 min, per target and format |
 | `voltage:protect_p95_seconds_10m` / `voltage:access_p95_seconds_10m` | p95 latency over 10 min |
+| `voltage:support_days_remaining` | Days until the running appliance version leaves vendor maintenance (negative = out of support) |
 | `voltage:certificate_days_until_expiry` | days left per certificate |
 
 ## Useful queries

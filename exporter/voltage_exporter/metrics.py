@@ -17,6 +17,8 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 from . import __version__
 from .config import Config
+from .lifecycle import split_version, support_end
+from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
 from .probes import TargetResult, run_target
 
 log = logging.getLogger(__name__)
@@ -38,6 +40,44 @@ policy_format = Gauge(f"{NS}_policy_format", "One series per format (always 1)",
 policy_auth_method = Gauge(f"{NS}_policy_auth_method", "Auth methods offered (always 1)", ["target", "method"])
 policy_changes = Counter(f"{NS}_policy_changes", "Times the policy hash changed since start", ["target"])
 policy_last_change = Gauge(f"{NS}_policy_last_change_timestamp_seconds", "When the policy last changed", ["target"])
+
+# ---- policy: what the file says about the crypto (R1, R2, R5, R12)
+key_table_current = Gauge(
+    f"{NS}_key_table_current_number", "currentNumber of a keyNumberTable (increments on rotation)", ["target", "table"]
+)
+key_table_versions = Gauge(f"{NS}_key_table_versions", "Key versions listed in a keyNumberTable", ["target", "table"])
+key_info = Gauge(
+    f"{NS}_key_info", "One series per key version (always 1)", ["target", "table", "number", "algorithm", "key_size"]
+)
+key_current_size = Gauge(
+    f"{NS}_key_current_size_bits", "Key size of the *current* key in the table (0 if unknown)", ["target", "table"]
+)
+key_rotations = Counter(f"{NS}_key_rotations", "Times currentNumber changed since exporter start", ["target", "table"])
+format_domain = Gauge(
+    f"{NS}_format_domain_size",
+    "Estimated FPE domain size (radix ** encrypted positions) where the policy says enough to compute it",
+    ["target", "format"],
+)
+format_below_min = Gauge(
+    f"{NS}_format_below_minimum_domain",
+    f"1 if the format's domain is under NIST SP 800-38G Rev. 1's {MIN_FPE_DOMAIN:,} floor",
+    ["target", "format"],
+)
+format_efpe = Gauge(
+    f"{NS}_policy_format_efpe",
+    "1 for embedded-FPE formats: ciphertext differs per key epoch, equality joins are unsafe",
+    ["target", "format"],
+)
+appliance_version = Gauge(
+    f"{NS}_appliance_version_info",
+    "Appliance version from the policy (always 1)",
+    ["target", "version", "major", "minor"],
+)
+support_end_ts = Gauge(
+    f"{NS}_support_end_timestamp_seconds",
+    "End of vendor maintenance for the running appliance version (only when known)",
+    ["target", "version", "release"],
+)
 
 # ---- tokenize
 probe_success = Gauge(f"{NS}_tokenize_success", "1 if the last protect+access round-trip succeeded",
@@ -65,6 +105,48 @@ last_run = Gauge(f"{NS}_probe_last_run_timestamp_seconds", "When the target was 
 cycles = Counter(f"{NS}_probe_cycles", "Completed probe cycles")
 
 _last_hash: dict[str, str] = {}
+_last_current: dict[tuple[str, str], int] = {}
+_support_overrides: dict = {}
+
+
+def configure(config: Config) -> None:
+    """Things `apply()` needs from the config (called once from the loop / --once)."""
+    _support_overrides.clear()
+    _support_overrides.update(config.support_end)
+
+
+def _apply_policy_crypto(t: str, p) -> None:  # noqa: ANN001 - PolicyInfo
+    # key number tables -> rotation observability
+    for table in p.key_tables:
+        key_rotations.labels(t, table.name)  # exist at 0 so increase() works from the first scrape
+        key_table_versions.labels(t, table.name).set(float(len(table.keys)))
+        if table.current_number is not None:
+            key_table_current.labels(t, table.name).set(float(table.current_number))
+            prev = _last_current.get((t, table.name))
+            if prev is not None and prev != table.current_number:
+                key_rotations.labels(t, table.name).inc()
+                log.warning("[%s] key table %s rotated: %s -> %s", t, table.name, prev, table.current_number)
+            _last_current[(t, table.name)] = table.current_number
+        for k in table.keys:
+            key_info.labels(t, table.name, str(k["number"]), k["algorithm"], str(k["key_size"] or "")).set(1.0)
+        cur = table.current
+        key_current_size.labels(t, table.name).set(float((cur or {}).get("key_size") or 0))
+    # formats -> domain size and eFPE
+    for f in p.formats:
+        n = format_domain_size(f)
+        if n is not None:
+            format_domain.labels(t, f["name"]).set(float(n))
+            format_below_min.labels(t, f["name"]).set(1.0 if n < MIN_FPE_DOMAIN else 0.0)
+        if is_efpe(f):
+            format_efpe.labels(t, f["name"]).set(1.0)
+    # appliance version -> lifecycle
+    if p.server_version:
+        major, minor = split_version(p.server_version)
+        appliance_version.labels(t, p.server_version, major, minor).set(1.0)
+        se = support_end(p.server_version, _support_overrides)
+        if se:
+            release, ts = se
+            support_end_ts.labels(t, p.server_version, release).set(ts)
 
 
 def apply(result: TargetResult) -> None:
@@ -84,6 +166,7 @@ def apply(result: TargetResult) -> None:
             policy_formats.labels(t, k).set(float(n))
         for m in p.auth_methods:
             policy_auth_method.labels(t, m).set(1.0)
+        _apply_policy_crypto(t, p)
         prev = _last_hash.get(t)
         if prev is not None and prev != p.sha256:
             policy_changes.labels(t).inc()
@@ -124,6 +207,7 @@ def apply(result: TargetResult) -> None:
 
 
 def probe_loop(config: Config, stop: threading.Event) -> None:
+    configure(config)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(config.targets)))) as pool:
         while not stop.is_set():
             started = time.perf_counter()

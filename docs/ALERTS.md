@@ -19,6 +19,11 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageCertificateExpiringSoon` | 7 ≤ days < 30 | — | warning | Schedule renewal; every client validates this cert |
 | `VoltageCertificateExpiringCritical` | days < 7 | — | critical | Renew now |
 | `VoltageTlsHandshakeFailing` | `voltage_tls_up == 0` | 5m | warning | Host down, port filtered, cipher/cert problem |
+| `VoltageKeyRotated` | `currentNumber` of a key table changed | — | info | Expected in a crypto-period change window; otherwise investigate. eFPE columns now hold two ciphertext epochs |
+| `VoltageWeakCurrentKey` | current key < 256 bits | 10m | warning | Rotate to a 256-bit key number; the vendor's PQC argument depends on it |
+| `VoltageFormatBelowMinimumDomain` | FPE domain < 10^6 | 10m | warning | NIST SP 800-38G Rev. 1 floor. CVV, last-4 SSN, state codes: use SST / FPH / AES with a schema change instead |
+| `VoltageVersionApproachingEndOfSupport` | < 180 days of vendor maintenance | — | warning | Plan the upgrade; **test the identity/master-secret restore first** |
+| `VoltageVersionOutOfSupport` | maintenance ended | — | critical | No security fixes; PCI DSS 6.3.3 finding |
 
 Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / tokenization-failing /
 policy-unreachable page immediately; inhibition stops symptom storms (policy down silences

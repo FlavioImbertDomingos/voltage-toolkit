@@ -3,6 +3,8 @@
     exporter:
       port: 9743
       interval_seconds: 30          # how often every probe runs (independent of Prometheus scrapes)
+      support_end:                  # optional: extend the built-in appliance support-lifecycle table
+        "7.0.4": 2027-11-30         #   version prefix -> end-of-maintenance date (from your support portal)
 
     targets:
       - name: prod
@@ -77,6 +79,7 @@ class Config:
     listen: str = "0.0.0.0"
     interval: float = 30.0
     log_level: str = "INFO"
+    support_end: dict = field(default_factory=dict)  # version prefix -> ISO date | {release, end}
 
 
 def _secret(entry: dict, name: str, key: str = "secret") -> str:
@@ -167,4 +170,5 @@ def load(path: str | Path) -> Config:
         listen=str(ex.get("listen", "0.0.0.0")),
         interval=float(os.environ.get("VOLTAGE_EXPORTER_INTERVAL", ex.get("interval_seconds", 30))),
         log_level=str(os.environ.get("VOLTAGE_EXPORTER_LOG_LEVEL", ex.get("log_level", "INFO"))),
+        support_end={str(k): v for k, v in (ex.get("support_end") or {}).items()},
     )

@@ -235,6 +235,61 @@ panels = [
         rename={"Value": "days"},
     ),  # fmt: skip
     table("Policy", f"voltage_policy_info{{{SEL}}}", 0, 35, h=4),
+    row("What the policy says about the crypto", 39),
+    stat(
+        "Formats under NIST's 10^6 domain floor",
+        f"sum(voltage_format_below_minimum_domain{{{SEL}}}) or vector(0)",
+        0,
+        40,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "eFPE formats (not join-safe)",
+        f"count(voltage_policy_format_efpe{{{SEL}}}) or vector(0)",
+        4,
+        40,
+    ),
+    stat(
+        "Key rotations (24h)",
+        f"sum(increase(voltage_key_rotations_total{{{SEL}}}[24h])) or vector(0)",
+        8,
+        40,
+    ),
+    stat(
+        "Weakest current key (bits)",
+        f"min(voltage_key_current_size_bits{{{SEL}}} > 0)",
+        12,
+        40,
+        thr=thresholds(("red", None), ("green", 256)),
+    ),
+    stat(
+        "Days of vendor support left",
+        f"min(voltage:support_days_remaining{{{SEL}}})",
+        16,
+        40,
+        w=8,
+        decimals=0,
+        thr=thresholds(("red", None), ("orange", 0), ("green", 180)),
+    ),
+    table(
+        "Key tables",
+        f"voltage_key_table_current_number{{{SEL}}}",
+        0,
+        44,
+        w=12,
+        h=7,
+        rename={"Value": "currentNumber"},
+    ),
+    table(
+        "FPE domain size per format",
+        f"sort(voltage_format_domain_size{{{SEL}}})",
+        12,
+        44,
+        w=12,
+        h=7,
+        rename={"Value": "domain"},
+    ),
+    table("Appliance version", f"voltage_appliance_version_info{{{SEL}}}", 0, 51, h=4),
 ]
 
 dashboard = {

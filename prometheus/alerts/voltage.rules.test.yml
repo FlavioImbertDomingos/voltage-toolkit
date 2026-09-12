@@ -74,3 +74,69 @@ tests:
             exp_annotations:
               summary: "clientPolicy.xml unreachable on prod"
               description: "Every SecureData client downloads the policy at startup. New app instances, pods and batch jobs cannot start tokenizing until this is fixed."
+
+  # --- crypto-policy rules (from clientPolicy.xml alone)
+  - interval: 15s
+    input_series:
+      - series: 'voltage_key_rotations_total{target="prod", table="PCI"}'
+        values: "0 0 0 1 1 1"
+      - series: 'voltage_key_table_current_number{target="prod", table="PCI"}'
+        values: "4 4 4 5 5 5"
+      - series: 'voltage_key_current_size_bits{target="prod", table="PII"}'
+        values: "128x60"
+      - series: 'voltage_key_current_size_bits{target="prod", table="PCI"}'
+        values: "256x60"
+      - series: 'voltage_format_below_minimum_domain{target="prod", format="SSN"}'
+        values: "1x60"
+      - series: 'voltage_format_domain_size{target="prod", format="SSN"}'
+        values: "100000x60"
+      - series: 'voltage_format_below_minimum_domain{target="prod", format="CC"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VoltageKeyRotated
+        exp_alerts:
+          - exp_labels: {severity: info, target: prod, table: PCI}
+            exp_annotations:
+              summary: "Key table PCI rotated on prod"
+              description: "currentNumber changed (now 5). Expected inside a crypto-period change window; otherwise investigate. Old key numbers stay listed so existing ciphertext still decrypts -- but eFPE columns will now hold two ciphertext epochs."
+      - eval_time: 5m
+        alertname: VoltageWeakCurrentKey
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: VoltageWeakCurrentKey
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod, table: PII}
+            exp_annotations:
+              summary: "Key table PII on prod is using a 128-bit key"
+              description: "The current key is below AES-256. OpenText's own post-quantum position rests on 256-bit symmetric keys (128-bit security under Grover); a 128-bit key does not get that argument. Rotate to a 256-bit key number."
+      - eval_time: 11m
+        alertname: VoltageFormatBelowMinimumDomain
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod, format: SSN}
+            exp_annotations:
+              summary: "FPE format SSN on prod has a domain under 10^6"
+              description: "Estimated domain 100k (radix ** encrypted positions). NIST SP 800-38G Rev. 1 makes a minimum of one million a requirement for FF1 -- small domains are attackable regardless of mode. Typical culprits: CVV, last-4-preserving SSN, state codes, short IDs. Use SST, FPH, or a schema change with AES instead."
+
+  - interval: 15s
+    input_series:
+      # 100 days of support left, and one version already 10 days out of support
+      - series: 'voltage_support_end_timestamp_seconds{target="prod", version="7.0.3.100100", release="DPP Foundation CE 24.4"}'
+        values: "8640000x8"
+      - series: 'voltage_support_end_timestamp_seconds{target="legacy", version="6.9.0", release="6.9"}'
+        values: "-864000x8"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VoltageVersionApproachingEndOfSupport
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod, version: "7.0.3.100100", release: "DPP Foundation CE 24.4"}
+            exp_annotations:
+              summary: "prod runs 7.0.3.100100: vendor maintenance ends in 100 days"
+              description: "DPP Foundation CE 24.4 leaves maintenance soon. Plan the upgrade -- and test the identity/master-secret restore first, the upgrade path depends on a database backup that has a documented failure mode."
+      - eval_time: 1m
+        alertname: VoltageVersionOutOfSupport
+        exp_alerts:
+          - exp_labels: {severity: critical, target: legacy, version: "6.9.0", release: "6.9"}
+            exp_annotations:
+              summary: "legacy runs 6.9.0, out of vendor maintenance"
+              description: "6.9 maintenance ended 10 days ago. No security fixes; a PCI DSS 6.3.3 finding waiting to happen."

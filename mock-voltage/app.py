@@ -21,6 +21,8 @@ Scenarios (switch at runtime: `curl -X POST localhost:8800/mock/scenario/slow`):
   policy-down     clientPolicy.xml returns 503 (nothing can start)
   keyserver-down  /vibekeys/ returns 503
   policy-changed  a new format appears in the policy (drift)
+  key-rotated     key table PCI: currentNumber 4 -> 5
+  weak-key        key table PII current key drops to 128-bit
   cert-expiring   (startup only) HTTPS cert valid for 7 days -- MOCK_TLS_CERT_DAYS=7
 """
 
@@ -56,15 +58,62 @@ USERS = {
     "monitor": os.environ.get("MOCK_PASSWORD", "changeme")
 }  # username -> password (LDAP-style)
 
+# Format attributes are the mock's own vocabulary (OpenText does not publish the schema);
+# the exporter's parser is forgiving about names. `alphabet` + `length` (- preserved chars)
+# is what lets it estimate the FPE domain size.
+#
+# SSN keeps the last 4 on purpose: 5 encrypted digits is a 10^5 domain, *under* the 10^6
+# minimum NIST SP 800-38G Rev. 1 requires for FF1 -- so the small-domain alert is visible
+# from the first scrape, the same way the 20-day certificate is. It is also true of real
+# "last-4" SSN formats, which is the point.
 FPE_FORMATS = {
-    "CC": {"description": "Credit card, preserves BIN(6) and last 4"},
-    "SSN": {"description": "US Social Security Number"},
-    "AlphaNumeric": {},
-    "UpperCaseAlphaNumeric": {},
-    "US7ASCII-PRINTABLE": {},
+    "CC": {
+        "description": "Credit card, preserves BIN(6) and last 4",
+        "alphabet": "digits",
+        "length": "16",
+        "preserveLeading": "6",
+        "preserveTrailing": "4",
+    },
+    "SSN": {
+        "description": "US Social Security Number, preserves last 4",
+        "alphabet": "digits",
+        "length": "9",
+        "preserveTrailing": "4",
+    },
+    "CC-EFPE": {
+        "description": "Credit card, embedded FPE (key number travels in the ciphertext)",
+        "alphabet": "digits",
+        "length": "16",
+        "preserveLeading": "6",
+        "preserveTrailing": "4",
+        "encryption": "eFPE",
+        "keyTable": "PCI",
+    },
+    "AlphaNumeric": {"alphabet": "alphanumeric", "minLength": "6", "maxLength": "64"},
+    "UpperCaseAlphaNumeric": {"alphabet": "0-9A-Z", "minLength": "4", "maxLength": "64"},
+    "US7ASCII-PRINTABLE": {"alphabet": "printable"},
     "ORA-DATE": {},
 }
-TOKEN_FORMATS = {"CC-ST-64O": {"description": "Secure Stateless Tokenization, keeps last 4"}}
+TOKEN_FORMATS = {
+    "CC-ST-64O": {"description": "Secure Stateless Tokenization, keeps last 4", "engine": "SST"},
+}
+
+# Key number tables: the real rotation mechanism (seen in OpenText's public demo policy).
+# Rotation is an increment of currentNumber; older key numbers stay listed so old
+# ciphertext still decrypts.
+KEY_TABLES = {
+    "PCI": {
+        "currentNumber": 4,
+        "keys": [
+            {"number": 1, "algorithm": "FPE", "keySize": 128},
+            {"number": 2, "algorithm": "FPE", "keySize": 256},
+            {"number": 3, "algorithm": "FPE", "keySize": 256},
+            {"number": 4, "algorithm": "FPE", "keySize": 256},
+        ],
+    },
+    "PII": {"currentNumber": 1, "keys": [{"number": 1, "algorithm": "FPE", "keySize": 256}]},
+}
+APPLIANCE_VERSION = os.environ.get("MOCK_APPLIANCE_VERSION", "7.0.3.100100")
 
 SCENARIOS = {
     "healthy": "Everything is fine.",
@@ -74,6 +123,8 @@ SCENARIOS = {
     "policy-down": "clientPolicy.xml returns 503.",
     "keyserver-down": "The key server endpoint returns 503.",
     "policy-changed": "A new format (PHONE) appears in the policy.",
+    "key-rotated": "Key table PCI rotates: currentNumber 4 -> 5 (a new 256-bit key appears).",
+    "weak-key": "Key table PII's current key is 128-bit.",
 }
 _state = {
     "scenario": os.environ.get("MOCK_SCENARIO", "healthy"),
@@ -108,7 +159,7 @@ def fpe(value: str, fmt: str, reverse: bool = False) -> str:
     """Length- and class-preserving substitution. Position-dependent so it's not a trivial table."""
     out = []
     keep = set()
-    if fmt == "CC":
+    if fmt in ("CC", "CC-EFPE"):
         digits_idx = [i for i, c in enumerate(value) if c.isdigit()]
         keep = set(digits_idx[:6] + digits_idx[-4:])  # keep BIN + last 4 like a real CC format
     for i, ch in enumerate(value):
@@ -194,16 +245,38 @@ def client_policy():
     fpe_formats = dict(FPE_FORMATS)
     if scenario() == "policy-changed":
         fpe_formats["PHONE"] = {"description": "added by scenario"}
+
+    def attrs(a: dict) -> str:
+        return "".join(f' {k}="{v}"' for k, v in a.items())
+
     fmts = "".join(
-        f'    <Format name="{n}" type="FPE"{" description=" + chr(34) + a["description"] + chr(34) if a.get("description") else ""}/>\n'
-        for n, a in fpe_formats.items()
-    )  # noqa: E501
-    toks = "".join(
-        f'    <Format name="{n}" type="SST" description="{a["description"]}"/>\n'
-        for n, a in TOKEN_FORMATS.items()
+        f'    <Format name="{n}" type="FPE"{attrs(a)}/>\n' for n, a in fpe_formats.items()
     )
+    toks = "".join(
+        f'    <Format name="{n}" type="SST"{attrs(a)}/>\n' for n, a in TOKEN_FORMATS.items()
+    )
+
+    tables = {
+        k: {"currentNumber": v["currentNumber"], "keys": list(v["keys"])}
+        for k, v in KEY_TABLES.items()
+    }
+    if scenario() == "key-rotated":
+        tables["PCI"]["currentNumber"] = 5
+        tables["PCI"]["keys"] = tables["PCI"]["keys"] + [
+            {"number": 5, "algorithm": "FPE", "keySize": 256}
+        ]
+    if scenario() == "weak-key":
+        tables["PII"]["keys"] = [{"number": 1, "algorithm": "FPE", "keySize": 128}]
+    keyxml = ""
+    for name, t in tables.items():
+        keyxml += f'    <keyNumberTable name="{name}" currentNumber="{t["currentNumber"]}">\n'
+        for k in t["keys"]:
+            keyxml += f'      <keyNumber number="{k["number"]}" algorithm="{k["algorithm"]}" keySize="{k["keySize"]}"/>\n'
+        keyxml += "    </keyNumberTable>\n"
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<clientPolicy version="7.0.2" district="{DISTRICT}" policyId="{DISTRICT}-2026-09">
+<clientPolicy version="{APPLIANCE_VERSION.rsplit(".", 1)[0]}" district="{DISTRICT}" policyId="{DISTRICT}-2026-09">
+  <server name="SecureDataAppliance" version="{APPLIANCE_VERSION}"/>
   <KeyServers>
     <KeyServer url="https://{KEY_HOST}/vibekeys/"/>
   </KeyServers>
@@ -212,6 +285,8 @@ def client_policy():
     <AuthMethod name="UsernamePassword"/>
     <AuthMethod name="LDAP"/>
   </AuthMethods>
+  <keyNumberConfig>
+{keyxml}  </keyNumberConfig>
   <FormatMappings>
 {fmts}  </FormatMappings>
   <TokenizationFormats>

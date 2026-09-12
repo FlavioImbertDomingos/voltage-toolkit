@@ -69,11 +69,15 @@ curl -X POST localhost:8800/mock/scenario/auth-fail       # auth-failure alert (
 curl -X POST localhost:8800/mock/scenario/policy-down     # nothing can start: critical
 curl -X POST localhost:8800/mock/scenario/keyserver-down  # key server alert
 curl -X POST localhost:8800/mock/scenario/policy-changed  # drift: a format appeared
+curl -X POST localhost:8800/mock/scenario/key-rotated     # key table PCI: currentNumber 4 -> 5
+curl -X POST localhost:8800/mock/scenario/weak-key        # a 128-bit current key
 curl -X POST localhost:8800/mock/scenario/healthy
 ```
 
-The mock's HTTPS certificate is valid for 20 days on purpose, so the certificate-expiry
-warning is visible from the first scrape.
+Two warnings are visible from the first scrape on purpose: the mock's HTTPS certificate is
+valid for 20 days, and its `SSN` format keeps the last 4 digits — which leaves a 10^5 domain,
+under the 10^6 floor NIST SP 800-38G Rev. 1 requires for FF1. Both are true of real
+deployments more often than anyone likes.
 
 ### What the metrics look like
 
@@ -87,6 +91,11 @@ voltage_tokenize_errors_total{format="CC",kind="auth",target="demo-prod"} 0.0
 voltage_policy_changes_total{target="demo-prod"} 0.0
 voltage_certificate_expiry_timestamp_seconds{host="voltage:8443",subject="CN=voltage:8443,O=Mock Voltage",target="demo-prod"} 1.79e+09
 voltage_keyserver_up{target="demo-prod",url="https://voltage:8443/vibekeys/"} 1.0
+voltage_key_table_current_number{table="PCI",target="demo-prod"} 4.0
+voltage_format_domain_size{format="SSN",target="demo-prod"} 100000.0
+voltage_format_below_minimum_domain{format="SSN",target="demo-prod"} 1.0
+voltage_policy_format_efpe{format="CC-EFPE",target="demo-prod"} 1.0
+voltage_appliance_version_info{major="7",minor="7.0",target="demo-prod",version="7.0.3.100100"} 1.0
 ```
 
 ### Try the Ansible side
@@ -138,8 +147,12 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 | Did someone change the config? | `voltage_policy_changes_total`, `VoltagePolicyChanged` | PCI change control; drift |
 | Will TLS break on Tuesday? | `voltage_certificate_expiry_timestamp_seconds`, `VoltageCertificateExpiring*` | The #1 cause of "everything stopped" |
 | Are key servers up? | `voltage_keyserver_up` | New identities and key rotation depend on them |
+| Did a key rotate? | `voltage_key_table_current_number`, `VoltageKeyRotated` | The real rotation mechanism is `currentNumber` in the policy — now observable |
+| Is a format too small to be safe? | `voltage_format_domain_size`, `VoltageFormatBelowMinimumDomain` | NIST's 10^6 floor for FF1; the appliance won't tell you |
+| Which columns can't be joined? | `voltage_policy_format_efpe` | eFPE ciphertext differs per key epoch |
+| Are we running out of support? | `voltage_appliance_version_info`, `voltage_support_end_timestamp_seconds` | The version is in the policy file; the dates are in the release notes |
 
-18 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
+19 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
 routing with inhibition, a Grafana dashboard.
 
 ---
@@ -158,7 +171,7 @@ voltage-toolkit/
 │   ├── playbooks/                      configure, audit, probe, deploy_exporter
 │   ├── docs/ADAPTER.md                 the http / command adapter contract
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
-├── prometheus/                         config + 18 alert rules + promtool tests
+├── prometheus/                         config + 19 alert rules + promtool tests
 ├── alertmanager/ · grafana/            routing, inhibition, generated dashboard
 └── docs/                               METRICS, ALERTS, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```
