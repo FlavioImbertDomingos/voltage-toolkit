@@ -20,6 +20,7 @@
         formats:
           - CC
           - SSN
+          - CC-EFPE
           - AlphaNumeric
           - UpperCaseAlphaNumeric
           - US7ASCII-PRINTABLE
