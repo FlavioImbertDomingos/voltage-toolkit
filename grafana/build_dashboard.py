@@ -291,6 +291,14 @@ panels = [
         rename={"Value": "domain"},
     ),
     table("Appliance version", f"voltage_appliance_version_info{{{SEL}}}", 0, 51, h=4),
+    row("Fleet agreement — do all members give the same answers?", 55),
+    stat("Tokens agree", 'min(voltage_fleet_agreement{check="token"})', 0, 56, mappings=OKBAD),
+    stat("Policy agrees", 'min(voltage_fleet_agreement{check="policy"})', 4, 56, mappings=OKBAD),
+    stat(
+        "Key tables agree", 'min(voltage_fleet_agreement{check="key_table"})', 8, 56, mappings=OKBAD
+    ),
+    stat("Versions agree", 'min(voltage_fleet_agreement{check="version"})', 12, 56, mappings=OKBAD),
+    table("Diverged members", "voltage_fleet_member_diverged == 1", 0, 60, h=6),
 ]
 
 dashboard = {

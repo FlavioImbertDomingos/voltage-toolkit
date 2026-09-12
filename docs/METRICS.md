@@ -64,6 +64,22 @@ round-trip probe stays green through all of them.
 Configure per target under `integrity:` — each check can be turned off, and `isolation_pairs`
 overrides the default pairing (each FPE probe against the next one, round-robin).
 
+## Fleet agreement — several vantage points, one district
+
+Targets that share a `fleet:` name are expected to be the same district seen from different
+places (two appliances behind a load balancer, primary and DR). These series have no `target`
+label — they are about the fleet.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_fleet_agreement` | gauge | `fleet`, `check`, `key` | 1 if every member agrees. `check` ∈ `policy` (configuration fingerprint: formats, auth, key tables, version — **not** hostnames), `version`, `key_table` (`key` = table; `currentNumber` equal), `token` (`key` = format; the same synthetic sample protects to the same value on every member) |
+| `voltage_fleet_members` | gauge | `fleet`, `check`, `key` | Members that reported; agreement is only evaluated with ≥ 2 |
+| `voltage_fleet_member_diverged` | gauge | `fleet`, `check`, `key`, `target` | 1 for the member(s) disagreeing with the fleet majority |
+
+Token comparison is by SHA-256 of the protected value; the exporter never keeps or exports a
+token. `check="token"` failing while every member round-trips fine on its own is the DR-readiness
+finding: a region built from its own district instead of the shared backup.
+
 ## TLS and key servers
 
 | Metric | Type | Labels | Meaning |

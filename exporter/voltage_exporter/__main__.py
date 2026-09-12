@@ -39,8 +39,10 @@ def main(argv: list[str] | None = None) -> int:
         from .probes import run_target
 
         rc = 0
+        results = []
         for t in config.targets:
             r = run_target(t)
+            results.append(r)
             status = "ok" if r.policy_ok else "FAIL " + r.policy_error
             extra = f" ({len(r.policy.formats)} formats, district={r.policy.district!r})" if r.policy else ""
             print(f"[{t.name}] policy: {status}{extra}")
@@ -82,6 +84,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{t.name}] tls {c.host}:{c.port}: " + (f"ok, expires {days}d" if c.ok else f"FAIL {c.error}"))
             for url, up in r.keyservers.items():
                 print(f"[{t.name}] keyserver {url}: {'up' if up else 'DOWN'}")
+        from .fleet import evaluate as evaluate_fleet
+
+        for c in evaluate_fleet(results):
+            state = "agree" if c.ok else ("DIVERGED " + c.detail if c.ok is False else f"n/a ({c.detail})")
+            print(f"[fleet {c.fleet}] {c.check}{(' ' + c.key) if c.key else ''} ({c.members} members): {state}")
+            rc = rc or (1 if c.ok is False else 0)
         return rc
 
     log.info("voltage-exporter %s: %d target(s), interval %.0fs", __version__, len(config.targets), config.interval)

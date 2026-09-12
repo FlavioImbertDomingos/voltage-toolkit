@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Fleet agreement** (roadmap R4, R15): targets sharing `fleet:` must agree. `voltage_fleet_agreement{check=policy|
+  version|key_table|token}`, `voltage_fleet_members`, `voltage_fleet_member_diverged`; alerts `VoltageRegionDivergence`
+  (critical, pages), `VoltagePolicyFleetDivergent` (10m), `VoltageFleetKeyTableSkew` (10m), `VoltageFleetVersionSkew`.
+  Policy is compared by a configuration fingerprint (formats, auth, key tables, version), not bytes, so hostnames may
+  differ. Tokens compared by SHA-256; never kept. Compose gains a second region `voltage-dr` (:8801/:8444) and the mock a
+  `diverged-keys` scenario; `make scenario-dr`. `voltage_policy_facts` returns `config_fingerprint`.
 - **Silent-corruption probes** (roadmap R3): `voltage_integrity_ok{check=determinism|double_protect|format_isolation}`
   and `voltage_integrity_checks_total`; alerts `VoltageFormatIsolationBroken` (critical, pages),
   `VoltageNonDeterministic` (critical, pages), `VoltageDoubleProtectCorrupts` (warning). Determinism is skipped for

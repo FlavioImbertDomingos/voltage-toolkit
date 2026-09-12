@@ -20,11 +20,12 @@ data only, no production values.
 | R1 key-version metrics | ✅ shipped — `feat: policy intelligence` |
 | R2 small-domain linter | ✅ shipped — `feat: policy intelligence` |
 | R3 silent-corruption probes | ✅ shipped — `feat: silent-corruption probes` |
-| R4 policy propagation lag | next |
+| R4 policy propagation lag | ✅ shipped — `feat: fleet agreement` |
 | R5 eFPE awareness | ✅ shipped — detection in `feat: policy intelligence`, determinism exclusion in `feat: silent-corruption probes` |
-| R6–R9 coverage / SDM seam | planned |
-| R10–R11, R13–R16 | planned |
+| R6–R9 coverage / SDM seam | next |
+| R10–R11, R13–R14, R16 | planned |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
+| R15 cross-region token equivalence | ✅ shipped — `feat: fleet agreement` |
 
 ---
 
@@ -78,7 +79,7 @@ Ship, against synthetic data only:
   (`voltage_determinism_ok`). Referential integrity across tables depends on this, and it is
   exactly what breaks when a key rotates underneath you.
 
-### R4. Policy propagation lag · **M**
+### R4. Policy propagation lag · **M** · ✅ shipped
 
 Vertica's `VoltageSecureRefreshPolicy()` response says it outright: *"Policy on other nodes will
 be refreshed the next time a Voltage operation is run on them."* Policy changes propagate
@@ -228,7 +229,7 @@ quantum posture, and flag pairing-based IBE usage separately from symmetric FPE/
 the harvest-now-decrypt-later question for archived data, and it is the right thing for a CBOM
 tool to answer.
 
-### R15. Cross-region token equivalence probe (DR readiness) · **S**
+### R15. Cross-region token equivalence probe (DR readiness) · **S** · ✅ shipped
 
 The stateless design makes multi-region DR cheap — no token vault to replicate — but it depends
 on three things being identical in both regions: the district master secret, the district domain

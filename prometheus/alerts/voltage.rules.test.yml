@@ -181,3 +181,49 @@ tests:
       - eval_time: 6m
         alertname: VoltageTokenizationFailing
         exp_alerts: []
+
+  # --- fleet agreement (R4, R15)
+  - interval: 15s
+    input_series:
+      - series: 'voltage_fleet_agreement{fleet="pci", check="token", key="CC"}'
+        values: "1 0 0 0 0"
+      - series: 'voltage_fleet_member_diverged{fleet="pci", check="token", key="CC", target="dr"}'
+        values: "0 1 1 1 1"
+      - series: 'voltage_fleet_member_diverged{fleet="pci", check="token", key="CC", target="prod"}'
+        values: "0 0 0 0 0"
+      - series: 'voltage_fleet_agreement{fleet="pci", check="policy", key=""}'
+        values: "0x60"
+      - series: 'voltage_fleet_member_diverged{fleet="pci", check="policy", key="", target="dr"}'
+        values: "1x60"
+      - series: 'voltage_fleet_agreement{fleet="pci", check="key_table", key="PCI"}'
+        values: "0x60"
+      - series: 'voltage_tokenize_success{target="dr", format="CC", identity="probe"}'
+        values: "1x60"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: VoltageRegionDivergence
+        exp_alerts:
+          - exp_labels: {severity: critical, fleet: pci, check: token, key: CC}
+            exp_annotations:
+              summary: "DR DIVERGENCE: fleet pci protects CC differently on dr "
+              description: "The same synthetic value protects to different tokens on different members of the fleet. Same policy, same formats, different master secret or token tables -- a region built from its own district rather than restored from the shared backup. Every member round-trips fine on its own, so nothing else alerts. If this fleet fails over, it will write tokens the other side cannot detokenize. Do not fail over until fixed."
+      - eval_time: 5m
+        alertname: VoltagePolicyFleetDivergent
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: VoltagePolicyFleetDivergent
+        exp_alerts:
+          - exp_labels: {severity: warning, fleet: pci, check: policy}
+            exp_annotations:
+              summary: "Fleet pci: members serve different policy configuration"
+              description: "Formats, auth methods, key tables or version differ between members (dr are the odd ones). Policy propagates lazily and per node, so a few minutes after a change is normal -- 10 minutes is not. Clients on different members are now enforcing different policy."
+      - eval_time: 11m
+        alertname: VoltageFleetKeyTableSkew
+        exp_alerts:
+          - exp_labels: {severity: warning, fleet: pci, check: key_table, key: PCI}
+            exp_annotations:
+              summary: "Fleet pci: key table PCI is at different currentNumber on different members"
+              description: "A rotation reached some members and not others. eFPE ciphertext produced on the rotated side embeds a key number the others do not have yet. Finish the rotation everywhere or roll it back; do not fail over in between."
+      - eval_time: 11m
+        alertname: VoltageTokenizationFailing
+        exp_alerts: []

@@ -25,6 +25,7 @@ targets:
       - voltage-ks-0000.example.com:443
       - voltage-mgmt.example.com:8443
     labels: {site: phx-dc1}
+    fleet: prod                  # targets with the same fleet name must agree (policy, key numbers, tokens)
     # Silent-corruption checks (all on by default). Determinism is skipped for eFPE formats.
     # isolation_pairs overrides the default "each FPE probe against the next one".
     integrity:

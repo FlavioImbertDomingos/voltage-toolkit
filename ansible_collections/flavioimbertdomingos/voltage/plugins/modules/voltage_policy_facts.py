@@ -48,6 +48,7 @@ ansible_facts:
         district: prod
         policy_id: prod-2026-09
         server_version: "7.0.3.100100"
+        config_fingerprint: "9b1c3e..."
         format_names: [CC, SSN, CC-ST-64O]
         formats:
           - {name: CC, kind: fpe, type: FPE}

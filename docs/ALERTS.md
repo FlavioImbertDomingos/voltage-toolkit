@@ -15,6 +15,10 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageFormatIsolationBroken` | token made under A detokenizes under B | — | critical | **Data exposure.** Two formats share a key or an identity is over-authorized; anyone allowed format B can read format A data. Incident |
 | `VoltageNonDeterministic` | `protect(x) != protect(x)` | — | critical | **Referential integrity.** Joins on the column silently drop rows. Rotation without eFPE, per-call tweak, client bug. eFPE formats are excluded on purpose |
 | `VoltageDoubleProtectCorrupts` | `access(protect(protect(x))) != protect(x)` | 5m | warning | An ETL step that protects twice would corrupt silently. Check format definition and client version |
+| `VoltageRegionDivergence` | fleet members protect the same value differently | — | critical | **DR divergence.** Same policy, different master secret / token tables. Do not fail over until fixed |
+| `VoltagePolicyFleetDivergent` | fleet members serve different policy configuration | 10m | warning | Lazy per-node propagation is normal for minutes, not tens of minutes |
+| `VoltageFleetKeyTableSkew` | `currentNumber` differs across members | 10m | warning | A rotation reached some members only; finish or roll back before any failover |
+| `VoltageFleetVersionSkew` | members on different appliance versions | 30m | info | Fine mid-upgrade, not as steady state |
 | `VoltageErrorRateHigh` | > 5 % failures over 10m | 5m | warning | Intermittent errors apps are retrying around |
 | `VoltageLatencyHigh` | p95 protect > 500 ms | 5m | warning | Appliance load, key server, network path, key rotation in progress |
 | `VoltageFormatNotPreserved` | token shape ≠ sample shape | 2m | warning | Wrong format bound to the identity, or a tokenization format used where FPE expected |
@@ -29,7 +33,7 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageVersionOutOfSupport` | maintenance ended | — | critical | No security fixes; PCI DSS 6.3.3 finding |
 
 Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / format-isolation /
-non-determinism / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
+non-determinism / region-divergence / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
 tokenize alerts; tokenize-failing silences error-rate/latency/auth for the same format).
 
 Thresholds are in the rule expressions — edit, then `promtool test rules` and

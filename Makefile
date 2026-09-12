@@ -16,6 +16,10 @@ scenario: ## Switch the mock scenario, e.g. `make scenario S=slow`
 	@test -n "$(S)" || (echo "usage: make scenario S=<healthy|slow|errors|auth-fail|policy-down|keyserver-down|policy-changed>"; exit 1)
 	curl -s -X POST http://localhost:8800/mock/scenario/$(S) && echo
 
+scenario-dr: ## Switch the DR mock scenario, e.g. `make scenario-dr S=diverged-keys`
+	@test -n "$(S)" || (echo "usage: make scenario-dr S=<healthy|diverged-keys|key-rotated|policy-changed|...>"; exit 1)
+	curl -s -X POST http://localhost:8801/mock/scenario/$(S) && echo
+
 test: ## Exporter unit tests (against an in-process mock)
 	cd exporter && python -m pytest -q
 

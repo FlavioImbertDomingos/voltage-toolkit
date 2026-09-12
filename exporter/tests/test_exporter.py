@@ -429,3 +429,107 @@ def test_integrity_metrics(mock_server, healthy):
     assert g(check="format_isolation", format="CC", against="SSN") == 0.0
     fails = {"target": "integ", "check": "format_isolation", "result": "fail"}
     assert REGISTRY.get_sample_value("voltage_integrity_checks_total", fails) >= 1
+
+
+# --------------------------------------------------------------------- fleet agreement (R4, R15)
+def _fleet_targets(mock_server, mock_dr):
+    from voltage_exporter.config import ProbeSpec
+
+    probes = [ProbeSpec("CC", "4111111111111111"), ProbeSpec("CC-ST-64O", "5500000000000004", tokenization=True)]
+    prod = target_for(mock_server, name="prod", fleet="pci", probes=probes)
+    dr_https, _ = mock_dr
+    dr = target_for(
+        mock_server, name="dr", fleet="pci", probes=probes,
+        policy_url=f"{dr_https}/policy/clientPolicy.xml", ws_url=dr_https,
+    )  # fmt: skip
+    lone = target_for(mock_server, name="lone", probes=probes)  # no fleet -> never compared
+    return prod, dr, lone
+
+
+def test_fleet_agrees_when_regions_match(mock_server, mock_dr, healthy):
+    from voltage_exporter.fleet import evaluate
+
+    prod, dr, lone = _fleet_targets(mock_server, mock_dr)
+    checks = evaluate([run_target(prod), run_target(dr), run_target(lone)])
+    by = {(c.check, c.key): c for c in checks}
+    assert all(c.fleet == "pci" for c in checks)
+    assert by[("policy", "")].ok is True and by[("policy", "")].members == 2
+    assert by[("version", "")].ok is True
+    assert by[("key_table", "PCI")].ok is True and by[("key_table", "PII")].ok is True
+    assert by[("token", "CC")].ok is True and by[("token", "CC-ST-64O")].ok is True
+
+
+def test_fleet_detects_policy_and_key_table_divergence(mock_server, mock_dr, healthy):
+    from voltage_exporter.fleet import evaluate
+
+    prod, dr, _ = _fleet_targets(mock_server, mock_dr)
+    _, dr_mod = mock_dr
+    dr_mod._state["scenario"] = "key-rotated"  # DR rotated, prod did not: policy hash and PCI table differ
+    try:
+        checks = {(c.check, c.key): c for c in evaluate([run_target(prod), run_target(dr)])}
+    finally:
+        dr_mod._state["scenario"] = "healthy"
+    assert checks[("policy", "")].ok is False and checks[("policy", "")].odd_ones == ["dr"]
+    assert checks[("key_table", "PCI")].ok is False and checks[("key_table", "PII")].ok is True
+    assert checks[("token", "CC")].ok is True  # CC is plain FPE, not on the rotated table -> still equal
+
+
+def test_fleet_detects_diverged_master_secret(mock_server, mock_dr, healthy):
+    """Same policy, same formats, different tokens: the DR region that was never restored."""
+    from voltage_exporter.fleet import evaluate
+
+    prod, dr, _ = _fleet_targets(mock_server, mock_dr)
+    _, dr_mod = mock_dr
+    dr_mod._state["scenario"] = "diverged-keys"
+    try:
+        rp, rd = run_target(prod), run_target(dr)
+        checks = {(c.check, c.key): c for c in evaluate([rp, rd])}
+    finally:
+        dr_mod._state["scenario"] = "healthy"
+    assert checks[("policy", "")].ok is True  # nothing in the policy file gives it away
+    assert all(t.ok for t in rp.tokenize + rd.tokenize)  # each region round-trips fine on its own
+    assert checks[("token", "CC")].ok is False and checks[("token", "CC")].odd_ones == ["dr"]
+    assert checks[("token", "CC-ST-64O")].ok is False  # SST tables too
+
+
+def test_fleet_needs_two_members_and_ignores_unfleeted(mock_server, mock_dr, healthy):
+    from voltage_exporter.fleet import evaluate
+
+    prod, _, lone = _fleet_targets(mock_server, mock_dr)
+    checks = evaluate([run_target(prod), run_target(lone)])
+    assert checks and all(c.ok is None and c.members == 1 for c in checks)
+    assert evaluate([run_target(lone)]) == []
+
+
+def test_fleet_metrics(mock_server, mock_dr, healthy):
+    from prometheus_client import REGISTRY
+
+    from voltage_exporter.fleet import evaluate
+
+    prod, dr, _ = _fleet_targets(mock_server, mock_dr)
+    _, dr_mod = mock_dr
+    dr_mod._state["scenario"] = "diverged-keys"
+    try:
+        metrics.apply_fleet(evaluate([run_target(prod), run_target(dr)]), ["prod", "dr"])
+    finally:
+        dr_mod._state["scenario"] = "healthy"
+    g = REGISTRY.get_sample_value
+    assert g("voltage_fleet_agreement", {"fleet": "pci", "check": "token", "key": "CC"}) == 0.0
+    assert g("voltage_fleet_agreement", {"fleet": "pci", "check": "policy", "key": ""}) == 1.0
+    assert g("voltage_fleet_members", {"fleet": "pci", "check": "token", "key": "CC"}) == 2.0
+    assert g("voltage_fleet_member_diverged", {"fleet": "pci", "check": "token", "key": "CC", "target": "dr"}) == 1.0
+    assert g("voltage_fleet_member_diverged", {"fleet": "pci", "check": "token", "key": "CC", "target": "prod"}) == 0.0
+    metrics.apply_fleet(evaluate([run_target(prod), run_target(dr)]), ["prod", "dr"])
+    assert g("voltage_fleet_agreement", {"fleet": "pci", "check": "token", "key": "CC"}) == 1.0
+    assert g("voltage_fleet_member_diverged", {"fleet": "pci", "check": "token", "key": "CC", "target": "dr"}) == 0.0
+
+
+def test_fleet_config_loads(tmp_path):
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(
+        "targets:\n"
+        "  - {name: a, policy_url: https://x/policy/clientPolicy.xml, identity: i, auth: {secret: s}, fleet: pci}\n"
+        "  - {name: b, policy_url: https://y/policy/clientPolicy.xml, identity: i, auth: {secret: s}}\n"
+    )
+    ts = config.load(cfg).targets
+    assert ts[0].fleet == "pci" and ts[1].fleet == ""
