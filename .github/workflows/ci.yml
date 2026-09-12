@@ -29,8 +29,10 @@ jobs:
           ruff check exporter mock-voltage grafana
           ruff format --check exporter mock-voltage grafana
       - run: cd exporter && python -m pytest -q
-      - name: policy.py is identical in exporter and collection
-        run: diff <(tail -n +5 exporter/voltage_exporter/policy.py) <(tail -n +7 ansible_collections/flavioimbertdomingos/voltage/plugins/module_utils/policy.py)
+      - name: policy.py and coverage.py are identical in exporter and collection
+        run: |
+          diff <(tail -n +5 exporter/voltage_exporter/policy.py) <(tail -n +7 ansible_collections/flavioimbertdomingos/voltage/plugins/module_utils/policy.py)
+          diff <(tail -n +5 exporter/voltage_exporter/coverage.py) <(tail -n +7 ansible_collections/flavioimbertdomingos/voltage/plugins/module_utils/coverage.py)
 
   collection:
     name: Ansible collection (units + sanity + playbooks)
@@ -63,6 +65,11 @@ jobs:
           curl -s -X POST localhost:8800/mock/scenario/policy-changed
           if ansible-playbook flavioimbertdomingos.voltage.audit -e voltage_audit_config_path=/tmp/run/voltage-config.yml -e voltage_audit_report_dir=/tmp/run/reports -e voltage_audit_validate_certs=false -e voltage_audit_fail_on_drift=true; then echo "drift not detected"; exit 1; fi
           grep -q "PHONE" /tmp/run/reports/voltage-audit.md
+          # coverage: the example feed has one unmapped PAN column -> reported, and drift with fail_on_drift
+          curl -s -X POST localhost:8800/mock/scenario/healthy
+          PB=$GITHUB_WORKSPACE/ansible_collections/flavioimbertdomingos/voltage/playbooks
+          if ansible-playbook flavioimbertdomingos.voltage.audit -e voltage_audit_config_path=/tmp/run/voltage-config.yml -e voltage_audit_report_dir=/tmp/run/reports -e voltage_audit_validate_certs=false -e voltage_audit_fail_on_drift=true -e voltage_audit_classification_csv=$PB/classification.example.csv -e voltage_audit_data_map_path=$PB/voltage-data-map.yml; then echo "unprotected column not detected"; exit 1; fi
+          grep -q "warehouse.dw.fact_orders.card_no" /tmp/run/reports/voltage-audit.md
 
   prometheus-rules:
     runs-on: ubuntu-latest
@@ -94,6 +101,12 @@ jobs:
           echo "$M" | grep -q 'voltage_policy_up{target="demo-prod"} 1.0'
           echo "$M" | grep -q 'voltage_keyserver_up{target="demo-prod",url="https://voltage:8443/vibekeys/"} 1.0'
           echo "$M" | grep -q '^voltage_certificate_expiry_timestamp_seconds'
+      - name: Coverage metrics from the demo feed
+        run: |
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q '^voltage_coverage_up 1.0'
+          echo "$M" | grep -q 'voltage_coverage_columns{classification="PAN",state="unmapped"} 1.0'
+          echo "$M" | grep -q 'voltage_coverage_column_info{.*column="card_no".*state="unmapped"'
       - name: Fleet agrees, then DR diverges
         run: |
           M=$(curl -sf http://localhost:9743/metrics)

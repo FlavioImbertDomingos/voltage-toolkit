@@ -22,3 +22,12 @@ voltage_audit_probe_secret: ""
 voltage_audit_probe_format: CC
 voltage_audit_probe_sample: "4111111111111111"
 voltage_audit_probe_api: rest
+
+# Coverage (R6/R7): join a classification feed with the data map and the live policies.
+# Both paths empty = skipped.
+voltage_audit_classification_csv: ""
+voltage_audit_data_map_path: "{{ playbook_dir }}/voltage-data-map.yml"
+voltage_audit_coverage_min_confidence: 0.8
+voltage_audit_coverage_sensitive_classes: []
+# Count unmapped / broken columns as drift (so fail_on_drift applies to them)
+voltage_audit_coverage_is_drift: true

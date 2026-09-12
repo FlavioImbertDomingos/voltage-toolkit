@@ -533,3 +533,131 @@ def test_fleet_config_loads(tmp_path):
     )
     ts = config.load(cfg).targets
     assert ts[0].fleet == "pci" and ts[1].fleet == ""
+
+
+# --------------------------------------------------------------------- coverage (R6, R7)
+FEED = """system,schema,table,column,classification,confidence
+cards-db,public,customers,pan,PAN,0.99
+cards-db,public,customers,cvv,CVV,0.97
+crm,,contacts,ssn,SSN,0.95
+crm,,contacts,email,EMAIL,0.40
+warehouse,dw,fact_orders,card_no,PAN,
+legacy,,ledger,acct,PAN,0.9
+"""
+DATA_MAP = {
+    "version": 1,
+    "columns": [
+        {"system": "cards-db", "schema": "public", "table": "customers", "column": "pan",
+         "district": "prod", "format": "CC", "identities": ["payments@demo.bank"], "classification": "PAN"},
+        {"system": "crm", "table": "contacts", "column": "ssn",
+         "district": "prod", "format": "SSN", "identities": ["crm@demo.bank"]},
+        {"system": "warehouse", "schema": "dw", "table": "fact_orders", "column": "card_no",
+         "district": "prod", "format": "CC-OLD", "identities": ["etl@demo.bank"]},
+        {"system": "legacy", "table": "ledger", "column": "acct",
+         "district": "mainframe", "format": "CC"},
+        {"system": "hr", "table": "people", "column": "tax_id", "district": "prod", "format": "SSN"},
+    ],
+}  # fmt: skip
+DESIRED = {
+    "identities": {
+        "payments@demo.bank": {"district": "prod", "formats": ["CC", "CC-ST-64O"]},
+        "crm@demo.bank": {"district": "prod", "formats": ["AlphaNumeric"]},  # not allowed SSN
+    }
+}
+
+
+def test_coverage_join():
+    from voltage_exporter import coverage as cov
+
+    feed, ferr = cov.parse_feed(FEED)
+    dmap, merr = cov.parse_data_map(DATA_MAP)
+    assert not ferr and not merr and len(feed) == 6 and len(dmap) == 5
+    rep = cov.evaluate(
+        feed, dmap, {"prod": ["CC", "SSN", "AlphaNumeric", "CC-ST-64O", "ORA-DATE"]},
+        cov.identities_from_desired_state(DESIRED), min_confidence=0.8,
+    )  # fmt: skip
+    verdict = {c.row.qualified: (c.state, c.reason) for c in rep.columns}
+    assert verdict["cards-db.public.customers.pan"] == ("protected", "")
+    assert verdict["cards-db.public.customers.cvv"][0] == "unmapped"
+    assert verdict["crm.contacts.ssn"] == ("broken", "crm@demo.bank not allowed format SSN")
+    assert verdict["crm.contacts.email"][0] == "unknown"  # below confidence
+    assert verdict["warehouse.dw.fact_orders.card_no"] == ("broken", "format CC-OLD not offered by district prod")
+    assert verdict["legacy.ledger.acct"][0] == "unknown"  # district policy unavailable -> not blamed
+    assert rep.to_dict()["totals"] == {"protected": 1, "unmapped": 1, "broken": 2, "unknown": 2}
+    assert [m.qualified for m in rep.unclassified_mappings] == ["hr.people.tax_id"]
+    # dead: offered, but no column and no identity uses it
+    assert rep.dead_formats == {"prod": ["ORA-DATE"]}
+    # class filter and identity-less evaluation
+    rep2 = cov.evaluate(feed, dmap, {"prod": ["CC", "SSN"]}, None, sensitive_classes=["PAN"])
+    assert {c.row.classification for c in rep2.columns} == {"PAN"}
+    assert rep2.counts()[("protected", "PAN")] == 1
+
+
+def test_coverage_parsers_report_errors():
+    from voltage_exporter import coverage as cov
+
+    rows, errs = cov.parse_feed("system,column\nx,y\n")
+    assert rows == [] and "no 'table' column" in errs[0]
+    rows, errs = cov.parse_feed("system,table,column,confidence\na,b,c,high\n,b,c,\n")
+    assert len(rows) == 1 and rows[0].confidence is None and len(errs) == 2
+    assert cov.parse_data_map({}) == ([], ["data map is empty"])
+    entries, errs = cov.parse_data_map({"columns": [{"system": "a", "table": "b"}, "junk"]})
+    assert entries == [] and len(errs) == 2
+    dup, _ = cov.parse_data_map({"columns": [DATA_MAP["columns"][0], DATA_MAP["columns"][0]]})
+    rep = cov.evaluate([], dup, {"prod": ["CC"]})
+    assert rep.errors and "duplicate" in rep.errors[0]
+
+
+def test_coverage_end_to_end_with_files_and_metrics(mock_server, healthy, tmp_path):
+    import yaml
+    from prometheus_client import REGISTRY
+
+    from voltage_exporter.config import CoverageConfig
+    from voltage_exporter.coverage_runner import run_coverage
+
+    feed = tmp_path / "classification.csv"
+    feed.write_text(FEED)
+    dmap = tmp_path / "map.yml"
+    dmap.write_text(yaml.safe_dump(DATA_MAP))
+    desired = tmp_path / "voltage-config.yml"
+    desired.write_text(yaml.safe_dump(DESIRED))
+    cfg = CoverageConfig(str(feed), str(dmap), str(desired), min_confidence=0.8, max_named_columns=2)
+
+    results = [run_target(target_for(mock_server))]  # mock district is 'prod'
+    rep, mtime = run_coverage(cfg, results)
+    assert rep is not None and mtime is not None
+    totals = rep.to_dict()["totals"]
+    assert totals["protected"] == 1 and totals["unmapped"] == 1 and totals["broken"] == 2 and totals["unknown"] == 2
+    assert rep.dead_formats["prod"]  # the mock offers formats the map never uses
+
+    metrics.apply_coverage(rep, mtime, cfg.max_named_columns)
+    g = REGISTRY.get_sample_value
+    assert g("voltage_coverage_up", {}) == 1.0
+    assert g("voltage_coverage_columns", {"state": "unmapped", "classification": "CVV"}) == 1.0
+    assert g("voltage_coverage_columns", {"state": "protected", "classification": "CVV"}) == 0.0  # exists at 0
+    assert g("voltage_coverage_feed_rows", {}) == 6.0
+    named = [s for m in REGISTRY.collect() if m.name == "voltage_coverage_column_info" for s in m.samples]
+    assert len(named) == 2  # capped
+    assert g("voltage_coverage_dead_format", {"district": "prod", "format": "ORA-DATE"}) == 1.0
+
+    # inputs missing -> coverage_up 0, nothing else touched
+    rep2, _ = run_coverage(CoverageConfig(str(tmp_path / "nope.csv"), str(dmap)), results)
+    assert rep2 is None
+    metrics.apply_coverage(rep2, None)
+    assert g("voltage_coverage_up", {}) == 0.0
+
+
+def test_coverage_config_loads(tmp_path):
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(
+        "coverage: {classification_csv: /x.csv, data_map: /m.yml, sensitive_classes: [PAN], min_confidence: 0.9}\n"
+        "targets:\n  - {name: a, policy_url: https://x/policy/clientPolicy.xml, identity: i, auth: {secret: s}}\n"
+    )
+    c = config.load(cfg).coverage
+    assert c and c.sensitive_classes == ["PAN"] and c.min_confidence == 0.9 and c.desired_state == ""
+    cfg.write_text(
+        "coverage: {classification_csv: /x.csv}\n"
+        "targets:\n  - {name: a, policy_url: https://x/policy/clientPolicy.xml, identity: i, auth: {secret: s}}\n"
+    )
+    with pytest.raises(config.ConfigError):
+        config.load(cfg)

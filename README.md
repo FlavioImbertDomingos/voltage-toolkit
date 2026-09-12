@@ -47,6 +47,11 @@ windows share a key and anyone with one badge can read everything), and *if I to
 can I still get back to where I was?* The machine says "OK" to all of these even when the answer
 is wrong. Only a robot that checks would know.
 
+It also reads two lists nobody usually puts side by side: the list of columns the discovery
+tool says hold card numbers, and the list of columns somebody wrote down as "tokenized by
+Voltage, using this format, by that application". A column on the first list and not the
+second is exactly what an auditor finds a year later. The robot finds it in thirty minutes.
+
 And when there are two machines — one in each data centre, meant to be identical — the robot
 asks both the same question and compares the answers. If the backup machine gives a *different*
 token for the same card number, nobody finds out until the day the main one fails and every
@@ -103,10 +108,11 @@ curl -X POST localhost:8801/mock/scenario/key-rotated     # a rotation that reac
 curl -X POST localhost:8800/mock/scenario/healthy
 ```
 
-Two warnings are visible from the first scrape on purpose: the mock's HTTPS certificate is
-valid for 20 days, and its `SSN` format keeps the last 4 digits — which leaves a 10^5 domain,
-under the 10^6 floor NIST SP 800-38G Rev. 1 requires for FF1. Both are true of real
-deployments more often than anyone likes.
+Three warnings are visible from the first scrape on purpose: the mock's HTTPS certificate is
+valid for 20 days; its `SSN` format keeps the last 4 digits — which leaves a 10^5 domain, under
+the 10^6 floor NIST SP 800-38G Rev. 1 requires for FF1; and the demo classification feed lists a
+PAN column (`warehouse.dw.fact_orders.card_no`) that the data map does not cover. All three are
+true of real deployments more often than anyone likes.
 
 ### What the metrics look like
 
@@ -169,6 +175,7 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 |---|---|---|
 | Can apps tokenize right now? | `voltage_tokenize_success`, `VoltageTokenizationFailing` | The only question that matters at 3 a.m. |
 | Is the data coming back right? | `voltage_tokenize_roundtrip_ok`, `VoltageRoundTripMismatch` | A wrong detokenize silently corrupts data |
+| Is every sensitive column actually protected? | `voltage_coverage_columns{state}`, `VoltageUnprotectedSensitiveColumn`, `VoltageBrokenProtectionMapping` | Discovery says PAN, the data map says nothing — PCI scope drift, in Prometheus rather than next year's ROC |
 | Would a failover work? | `voltage_fleet_agreement{check="token"}`, `VoltageRegionDivergence` | Two regions, same policy, different tokens: every member round-trips fine alone |
 | Do all nodes serve the same policy? | `voltage_fleet_agreement{check="policy"}`, `VoltagePolicyFleetDivergent` | Propagation is lazy and per node |
 | Is it *correct*, not just working? | `voltage_integrity_ok{check}`, `VoltageFormatIsolationBroken`, `VoltageNonDeterministic`, `VoltageDoubleProtectCorrupts` | Formats sharing a key, non-deterministic protection, double-protect corruption — all return HTTP 200 |
@@ -184,7 +191,7 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 | Which columns can't be joined? | `voltage_policy_format_efpe` | eFPE ciphertext differs per key epoch |
 | Are we running out of support? | `voltage_appliance_version_info`, `voltage_support_end_timestamp_seconds` | The version is in the policy file; the dates are in the release notes |
 
-26 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
+31 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
 routing with inhibition, a Grafana dashboard.
 
 ---
@@ -200,12 +207,12 @@ voltage-toolkit/
 │   ├── plugins/modules/                voltage_policy_facts, voltage_probe, voltage_district, voltage_identity, voltage_auth_method
 │   ├── plugins/module_utils/           policy parser (shared with the exporter), WS client, desired-state backends
 │   ├── roles/                          voltage_policy_audit, voltage_exporter
-│   ├── playbooks/                      configure, audit, probe, deploy_exporter
+│   ├── playbooks/                      configure, audit, probe, deploy_exporter, voltage-data-map.yml
 │   ├── docs/ADAPTER.md                 the http / command adapter contract
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
-├── prometheus/                         config + 26 alert rules + promtool tests
+├── prometheus/                         config + 31 alert rules + promtool tests
 ├── alertmanager/ · grafana/            routing, inhibition, generated dashboard
-└── docs/                               METRICS, ALERTS, REAL-VOLTAGE, ARCHITECTURE, FAQ
+└── docs/                               METRICS, ALERTS, COVERAGE, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```
 
 ## Status & honesty

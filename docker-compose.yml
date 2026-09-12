@@ -79,6 +79,8 @@ services:
       VOLTAGE_PASSWORD: ${VOLTAGE_PASSWORD:-changeme}
     volumes:
       - ./config/voltage-exporter.demo.yml:/config/voltage-exporter.yml:ro
+      - ./config/classification.demo.csv:/config/classification.csv:ro
+      - ./config/voltage-data-map.demo.yml:/config/voltage-data-map.yml:ro
     ports:
       - "9743:9743"
     depends_on:

@@ -227,3 +227,58 @@ tests:
       - eval_time: 11m
         alertname: VoltageTokenizationFailing
         exp_alerts: []
+
+  # --- coverage (R6, R7)
+  - interval: 15s
+    input_series:
+      - series: 'voltage_coverage_columns{state="unmapped", classification="PAN"}'
+        values: "1x200"
+      - series: 'voltage_coverage_columns{state="protected", classification="PAN"}'
+        values: "4x200"
+      - series: 'voltage_coverage_columns{state="broken", classification="SSN"}'
+        values: "0 0 2x200"
+      - series: 'voltage_coverage_dead_format{district="prod", format="ORA-DATE"}'
+        values: "1x6000"
+      - series: 'voltage_coverage_feed_mtime_seconds{}'
+        values: "-864000x60"
+      - series: 'voltage_coverage_up{}'
+        values: "0x120"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: VoltageUnprotectedSensitiveColumn
+        exp_alerts: []
+      - eval_time: 31m
+        alertname: VoltageUnprotectedSensitiveColumn
+        exp_alerts:
+          - exp_labels: {severity: warning, classification: PAN}
+            exp_annotations:
+              summary: "1 column(s) classified PAN have no protection mapping"
+              description: "Discovery says these columns hold PAN; the data map has no entry for them, so nothing tokenizes them and no identity is authorised to. PCI scope drift, caught in Prometheus rather than in next year's ROC. Named in voltage_coverage_column_info{state=\"unmapped\"}. Either map them (voltage-data-map.yml) or dispute the classification -- do not leave them."
+      - eval_time: 11m
+        alertname: VoltageBrokenProtectionMapping
+        exp_alerts:
+          - exp_labels: {severity: critical, classification: SSN}
+            exp_annotations:
+              summary: "2 column(s) classified SSN are mapped to protection that no longer holds"
+              description: "The data map says these columns are protected, but the format is no longer offered by the district, the identity is not declared, or it is not allowed that format. The application believes it is tokenizing; the appliance will refuse or a different identity is doing it. See voltage_coverage_column_info{state=\"broken\"} for the reason per column."
+      - eval_time: 1m
+        alertname: VoltageClassificationFeedStale
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "The classification feed is 10 days old"
+              description: "Coverage is only as current as discovery. A feed nobody refreshes reports the world as it was, not as it is."
+      - eval_time: 16m
+        alertname: VoltageCoverageInputsUnreadable
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "Coverage inputs (classification feed / data map) cannot be read"
+              description: "voltage_coverage_up is 0: a file is missing, unreadable or not valid YAML/CSV. Coverage metrics are stale until fixed; check exporter logs."
+      - eval_time: 25h
+        alertname: VoltageDeadFormat
+        exp_alerts:
+          - exp_labels: {severity: info, district: prod, format: ORA-DATE}
+            exp_annotations:
+              summary: "Format ORA-DATE in district prod is offered but nothing uses it"
+              description: "No data-map column and no declared identity references it. Its keys still rotate and it is still an authorisable capability. Retire it, or map what uses it."

@@ -18,6 +18,8 @@ config.yml ─► voltage_exporter.config.load()
                  ▼
            metrics.apply(result)  ──► prometheus_client Gauges / Counters / Histograms
            fleet.evaluate(all results) ──► metrics.apply_fleet()   (targets sharing `fleet:` must agree)
+           coverage_runner.run_coverage() ──► coverage.evaluate() ──► metrics.apply_coverage()
+                 (classification CSV × voltage-data-map.yml × the districts' live formats)
                  ├─ policy.format_domain_size() / is_efpe()   per format  (R2, R5)
                  ├─ key tables → current number, rotation counter, key size  (R1)
                  └─ lifecycle.support_end(server_version)       (R12; built-in table + config overrides)
@@ -57,6 +59,12 @@ and the SHA-256 of each probe's token. One assertion covers master-secret parity
 naming, token-table parity and format parity. It runs after every cycle, across all targets,
 which is why the loop collects results before applying them.
 
+**Why the coverage join lives here and not in keycensus:** keycensus inventories *keys,
+certificates and endpoints*. Coverage is about *data columns* and which format protects them —
+a different subject with different inputs (a discovery feed, a data map). Keeping it here also
+means the audit role and the exporter share one stdlib module, exactly like the policy parser.
+keycensus can consume the output later. See [COVERAGE.md](COVERAGE.md).
+
 **Why hash the policy:** clientPolicy.xml is the only unauthenticated view of the district's
 configuration. A hash change is either a change window or an incident.
 
@@ -90,7 +98,7 @@ voltage_policy_audit role ─► voltage_policy_facts per district, diff vs volt
 voltage_exporter role      ─► config + env file + (docker run | venv + systemd)
 ```
 
-`module_utils/policy.py` is a verbatim copy of `exporter/voltage_exporter/policy.py` so the
+`module_utils/policy.py` and `module_utils/coverage.py` are verbatim copies of the exporter's so the
 collection has zero third-party dependencies (Ansible module_utils cannot import pip packages).
 The exporter's tests cover the parser; a CI step checks the two files are identical.
 

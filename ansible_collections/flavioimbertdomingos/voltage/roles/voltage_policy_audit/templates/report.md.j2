@@ -22,4 +22,27 @@ Generated {{ voltage_audit_summary.generated_at }} from `{{ voltage_audit_config
 {% endif %}
 {% endfor %}
 
+{% if voltage_audit_coverage %}
+## Coverage — classified sensitive columns
+
+{{ voltage_audit_coverage.feed_rows }} classified column(s), {{ voltage_audit_coverage.map_entries }} data-map entries:
+**{{ voltage_audit_coverage.totals.protected }} protected**, **{{ voltage_audit_coverage.totals.unmapped }} unmapped**, **{{ voltage_audit_coverage.totals.broken }} broken**, {{ voltage_audit_coverage.totals.unknown }} unknown.
+
+| Column | Class | State | Reason | District / format |
+|---|---|---|---|---|
+{% for c in voltage_audit_coverage.columns if c.state != 'protected' %}
+| `{{ c.column }}` | {{ c.classification }} | **{{ c.state }}** | {{ c.reason }} | {{ c.district }}{% if c.format %} / {{ c.format }}{% endif %} |
+{% endfor %}
+{% if voltage_audit_coverage.columns | selectattr('state', 'ne', 'protected') | list | length == 0 %}
+| — | | | every classified column is protected | |
+{% endif %}
+
+- Dead formats (offered, used by no column and no identity): {% for d, f in voltage_audit_coverage.dead_formats.items() %}`{{ d }}`: {{ f | join(', ') }}{{ '; ' if not loop.last }}{% else %}—{% endfor %}
+
+- Mapped columns the feed never mentioned: {{ voltage_audit_coverage.unclassified_mappings | join(', ') or '—' }}
+{% if voltage_audit_coverage.errors %}
+- Input errors: {{ voltage_audit_coverage.errors | join('; ') }}
+{% endif %}
+
+{% endif %}
 _Identities are not visible in `clientPolicy.xml`; they are reported as declared and checked against the formats the district offers._

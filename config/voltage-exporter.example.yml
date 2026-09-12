@@ -5,6 +5,15 @@ exporter:
   port: 9743
   interval_seconds: 30       # every probe runs this often; each tokenize probe = 2 WS calls
 
+# Optional: join a classification feed (from SDM, Core Data Discovery, or a spreadsheet)
+# with your data map and the live policy. See docs/COVERAGE.md.
+# coverage:
+#   classification_csv: /etc/voltage-exporter/classification.csv
+#   data_map: /etc/voltage-exporter/voltage-data-map.yml
+#   desired_state: /etc/voltage-exporter/voltage-config.yml   # enables identity checks
+#   min_confidence: 0.8
+#   sensitive_classes: [PAN, SSN, CVV]
+
 targets:
   - name: prod
     policy_url: https://voltage-pp-0000.example.com/policy/clientPolicy.xml

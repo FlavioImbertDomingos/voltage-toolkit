@@ -6,6 +6,14 @@
       support_end:                  # optional: extend the built-in appliance support-lifecycle table
         "7.0.4": 2027-11-30         #   version prefix -> end-of-maintenance date (from your support portal)
 
+    coverage:                       # optional: is every classified sensitive column actually protected?
+      classification_csv: /config/classification.csv     # system,schema,table,column,classification,confidence
+      data_map: /config/voltage-data-map.yml             # column -> district/format/identities (config-as-code)
+      desired_state: /config/voltage-config.yml          # optional: enables identity checks
+      min_confidence: 0.8
+      sensitive_classes: [PAN, SSN, CVV]                  # optional filter; default: every row
+      max_named_columns: 50                               # cap on the per-column info series
+
     targets:
       - name: prod
         policy_url: https://voltage-pp-0000.demo.bank/policy/clientPolicy.xml
@@ -85,6 +93,16 @@ class Target:
 
 
 @dataclass
+class CoverageConfig:
+    classification_csv: str
+    data_map: str
+    desired_state: str = ""
+    min_confidence: float = 0.0
+    sensitive_classes: list[str] = field(default_factory=list)
+    max_named_columns: int = 50
+
+
+@dataclass
 class Config:
     targets: list[Target]
     port: int = 9743
@@ -92,6 +110,7 @@ class Config:
     interval: float = 30.0
     log_level: str = "INFO"
     support_end: dict = field(default_factory=dict)  # version prefix -> ISO date | {release, end}
+    coverage: CoverageConfig | None = None
 
 
 def _secret(entry: dict, name: str, key: str = "secret") -> str:
@@ -187,6 +206,20 @@ def load(path: str | Path) -> Config:
     if not targets:
         raise ConfigError(f"{path}: 'targets' is empty")
     ex = raw.get("exporter") or {}
+    cov = None
+    if raw.get("coverage"):
+        c = raw["coverage"]
+        for key in ("classification_csv", "data_map"):
+            if not c.get(key):
+                raise ConfigError(f"coverage needs '{key}'")
+        cov = CoverageConfig(
+            classification_csv=str(c["classification_csv"]),
+            data_map=str(c["data_map"]),
+            desired_state=str(c.get("desired_state") or ""),
+            min_confidence=float(c.get("min_confidence", 0.0)),
+            sensitive_classes=[str(x) for x in (c.get("sensitive_classes") or [])],
+            max_named_columns=int(c.get("max_named_columns", 50)),
+        )
     return Config(
         targets=targets,
         port=int(os.environ.get("VOLTAGE_EXPORTER_PORT", ex.get("port", 9743))),
@@ -194,4 +227,5 @@ def load(path: str | Path) -> Config:
         interval=float(os.environ.get("VOLTAGE_EXPORTER_INTERVAL", ex.get("interval_seconds", 30))),
         log_level=str(os.environ.get("VOLTAGE_EXPORTER_LOG_LEVEL", ex.get("log_level", "INFO"))),
         support_end={str(k): v for k, v in (ex.get("support_end") or {}).items()},
+        coverage=cov,
     )

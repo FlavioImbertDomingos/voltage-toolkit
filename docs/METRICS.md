@@ -64,6 +64,20 @@ round-trip probe stays green through all of them.
 Configure per target under `integrity:` — each check can be turned off, and `isolation_pairs`
 overrides the default pairing (each FPE probe against the next one, round-robin).
 
+## Coverage — classified sensitive columns × data map × live policy
+
+See [COVERAGE.md](COVERAGE.md). Evaluated once per cycle when `coverage:` is configured; no
+`target` label.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_coverage_up` | gauge | — | 1 if the feed and data map were read and evaluated |
+| `voltage_coverage_columns` | gauge | `state` (protected / unmapped / broken / unknown), `classification` | Classified columns per state. Every (state, class) pair exists, at 0 if empty |
+| `voltage_coverage_column_info` | gauge | `state`, `system`, `schema`, `table`, `column`, `classification`, `reason` | One series per column that is **not** protected; capped by `coverage.max_named_columns` |
+| `voltage_coverage_dead_format` | gauge | `district`, `format` | 1 for a format offered by the district that no column and no declared identity uses |
+| `voltage_coverage_feed_rows`, `voltage_coverage_map_entries`, `voltage_coverage_unclassified_mappings`, `voltage_coverage_errors` | gauge | — | Sizes and input problems |
+| `voltage_coverage_feed_mtime_seconds` | gauge | — | Modification time of the classification feed (→ `voltage:coverage_feed_age_days`) |
+
 ## Fleet agreement — several vantage points, one district
 
 Targets that share a `fleet:` name are expected to be the same district seen from different
@@ -107,6 +121,7 @@ and `extra_tls_hosts` from config.
 |---|---|
 | `voltage:tokenize_error_ratio_10m` | failures / all probes over 10 min, per target and format |
 | `voltage:protect_p95_seconds_10m` / `voltage:access_p95_seconds_10m` | p95 latency over 10 min |
+| `voltage:coverage_feed_age_days` | Age of the classification feed |
 | `voltage:support_days_remaining` | Days until the running appliance version leaves vendor maintenance (negative = out of support) |
 | `voltage:certificate_days_until_expiry` | days left per certificate |
 

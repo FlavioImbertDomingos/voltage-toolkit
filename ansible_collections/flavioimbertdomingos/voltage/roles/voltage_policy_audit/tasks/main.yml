@@ -26,12 +26,28 @@
   loop_control:
     loop_var: _district
 
+- name: Coverage — is every classified sensitive column actually protected?
+  flavioimbertdomingos.voltage.voltage_coverage:
+    classification_csv: "{{ voltage_audit_classification_csv }}"
+    data_map: "{{ voltage_audit_data_map_path }}"
+    desired_state: "{{ voltage_audit_config_path }}"
+    policy_formats: "{{ _voltage_live_formats | default({}) }}"
+    min_confidence: "{{ voltage_audit_coverage_min_confidence }}"
+    sensitive_classes: "{{ voltage_audit_coverage_sensitive_classes }}"
+  register: _coverage
+  when: voltage_audit_classification_csv | length > 0 and voltage_audit_data_map_path | length > 0
+
+- name: Coverage result
+  ansible.builtin.set_fact:
+    voltage_audit_coverage: "{{ _coverage.report | default({}) }}"
+
 - name: Summarise
   ansible.builtin.set_fact:
     voltage_audit_summary:
       districts: "{{ voltage_audit_results | length }}"
       with_drift: "{{ voltage_audit_results | selectattr('drift', 'equalto', true) | list | length }}"
       unreachable: "{{ voltage_audit_results | selectattr('reachable', 'equalto', false) | list | length }}"
+      unprotected_columns: "{{ (voltage_audit_coverage.totals.unmapped | default(0) | int) + (voltage_audit_coverage.totals.broken | default(0) | int) }}"
       generated_at: "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
 
 - name: Write reports
@@ -44,7 +60,7 @@
         mode: "0755"
     - name: JSON report
       ansible.builtin.copy:
-        content: "{{ {'summary': voltage_audit_summary, 'districts': voltage_audit_results} | to_nice_json }}\n"
+        content: "{{ {'summary': voltage_audit_summary, 'districts': voltage_audit_results, 'coverage': voltage_audit_coverage} | to_nice_json }}\n"
         dest: "{{ voltage_audit_report_dir }}/voltage-audit.json"
         mode: "0644"
     - name: Markdown report
@@ -57,11 +73,20 @@
   ansible.builtin.debug:
     msg: >-
       Audited {{ voltage_audit_summary.districts }} district(s):
-      {{ voltage_audit_summary.with_drift }} with drift, {{ voltage_audit_summary.unreachable }} unreachable.
+      {{ voltage_audit_summary.with_drift }} with drift, {{ voltage_audit_summary.unreachable }} unreachable{% if voltage_audit_coverage %},
+      {{ voltage_audit_summary.unprotected_columns }} classified column(s) unprotected{% endif %}.
 
 - name: Fail on drift
   ansible.builtin.fail:
-    msg: "Configuration drift detected: {{ voltage_audit_results | selectattr('drift', 'equalto', true) | map(attribute='district') | list }}"
+    msg: >-
+      Configuration drift detected:
+      {{ voltage_audit_results | selectattr('drift', 'equalto', true) | map(attribute='district') | list }}
+      {%- if voltage_audit_coverage_is_drift | bool and (voltage_audit_summary.unprotected_columns | int) > 0 %};
+      unprotected classified columns:
+      {{ voltage_audit_coverage.columns | selectattr('state', 'in', ['unmapped', 'broken']) | map(attribute='column') | list }}
+      {%- endif %}
   when:
     - voltage_audit_fail_on_drift | bool
-    - (voltage_audit_summary.with_drift | int) > 0 or (voltage_audit_summary.unreachable | int) > 0
+    - >-
+      (voltage_audit_summary.with_drift | int) > 0 or (voltage_audit_summary.unreachable | int) > 0
+      or (voltage_audit_coverage_is_drift | bool and (voltage_audit_summary.unprotected_columns | int) > 0)
