@@ -299,6 +299,35 @@ panels = [
     ),
     stat("Versions agree", 'min(voltage_fleet_agreement{check="version"})', 12, 56, mappings=OKBAD),
     table("Diverged members", "voltage_fleet_member_diverged == 1", 0, 60, h=6),
+    row("Coverage — is every classified sensitive column protected?", 66),
+    stat(
+        "Unmapped sensitive columns",
+        'sum(voltage_coverage_columns{state="unmapped"}) or vector(0)',
+        0,
+        67,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Broken mappings",
+        'sum(voltage_coverage_columns{state="broken"}) or vector(0)',
+        4,
+        67,
+        thr=thresholds(("green", None), ("red", 1)),
+    ),
+    stat(
+        "Protected columns", 'sum(voltage_coverage_columns{state="protected"}) or vector(0)', 8, 67
+    ),
+    stat("Dead formats", "count(voltage_coverage_dead_format == 1) or vector(0)", 12, 67),
+    stat(
+        "Feed age (days)",
+        "voltage:coverage_feed_age_days",
+        16,
+        67,
+        w=8,
+        decimals=1,
+        thr=thresholds(("green", None), ("orange", 7), ("red", 30)),
+    ),
+    table("Columns not protected", "voltage_coverage_column_info", 0, 71, h=7),
 ]
 
 dashboard = {

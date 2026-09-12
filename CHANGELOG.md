@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Coverage** (roadmap R6, R7): classification feed (CSV) × `voltage-data-map.yml` × live policy → every classified
+  column is protected / unmapped / broken / unknown; dead formats the other way. Shared stdlib `coverage.py` (exporter +
+  `module_utils`, CI-diffed). Exporter: `coverage:` config, `voltage_coverage_*` metrics, alerts
+  `VoltageUnprotectedSensitiveColumn`, `VoltageBrokenProtectionMapping`, `VoltageDeadFormat`, `VoltageClassificationFeedStale`,
+  `VoltageCoverageInputsUnreadable`. Collection: `voltage_coverage` module; the audit role reports coverage and counts
+  unmapped/broken columns as drift. Demo feed + data map with one deliberately unmapped PAN column. `docs/COVERAGE.md`.
 - **Fleet agreement** (roadmap R4, R15): targets sharing `fleet:` must agree. `voltage_fleet_agreement{check=policy|
   version|key_table|token}`, `voltage_fleet_members`, `voltage_fleet_member_diverged`; alerts `VoltageRegionDivergence`
   (critical, pages), `VoltagePolicyFleetDivergent` (10m), `VoltageFleetKeyTableSkew` (10m), `VoltageFleetVersionSkew`.

@@ -1,0 +1,6 @@
+system,schema,table,column,classification,confidence
+cards-db,public,customers,pan,PAN,0.99
+cards-db,public,customers,ssn,SSN,0.98
+crm,,contacts,ssn,SSN,0.95
+crm,,contacts,notes,FREE_TEXT,0.35
+warehouse,dw,fact_orders,card_no,PAN,0.97

@@ -20,6 +20,8 @@ groups:
         expr: (voltage_certificate_expiry_timestamp_seconds - time()) / 86400
       - record: voltage:support_days_remaining
         expr: (voltage_support_end_timestamp_seconds - time()) / 86400
+      - record: voltage:coverage_feed_age_days
+        expr: (time() - voltage_coverage_feed_mtime_seconds) / 86400
 
   - name: voltage-availability
     rules:
@@ -233,3 +235,45 @@ groups:
         annotations:
           summary: "Fleet {{ $labels.fleet }}: members run different appliance versions"
           description: "Fine during a rolling upgrade; not fine as a steady state. SST3 (CE 24.4) in particular changes the tokenization engine."
+
+  # Coverage: classified sensitive columns x data map x live policy (R6, R7).
+  - name: voltage-coverage
+    rules:
+      - alert: VoltageUnprotectedSensitiveColumn
+        expr: sum by (classification) (voltage_coverage_columns{state="unmapped"}) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $value }} column(s) classified {{ $labels.classification }} have no protection mapping"
+          description: "Discovery says these columns hold {{ $labels.classification }}; the data map has no entry for them, so nothing tokenizes them and no identity is authorised to. PCI scope drift, caught in Prometheus rather than in next year's ROC. Named in voltage_coverage_column_info{state=\"unmapped\"}. Either map them (voltage-data-map.yml) or dispute the classification -- do not leave them."
+
+      - alert: VoltageBrokenProtectionMapping
+        expr: sum by (classification) (voltage_coverage_columns{state="broken"}) > 0
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $value }} column(s) classified {{ $labels.classification }} are mapped to protection that no longer holds"
+          description: "The data map says these columns are protected, but the format is no longer offered by the district, the identity is not declared, or it is not allowed that format. The application believes it is tokenizing; the appliance will refuse or a different identity is doing it. See voltage_coverage_column_info{state=\"broken\"} for the reason per column."
+
+      - alert: VoltageDeadFormat
+        expr: voltage_coverage_dead_format == 1
+        for: 24h
+        labels: {severity: info}
+        annotations:
+          summary: "Format {{ $labels.format }} in district {{ $labels.district }} is offered but nothing uses it"
+          description: "No data-map column and no declared identity references it. Its keys still rotate and it is still an authorisable capability. Retire it, or map what uses it."
+
+      - alert: VoltageClassificationFeedStale
+        expr: voltage:coverage_feed_age_days > 7
+        labels: {severity: warning}
+        annotations:
+          summary: "The classification feed is {{ $value | printf \"%.0f\" }} days old"
+          description: "Coverage is only as current as discovery. A feed nobody refreshes reports the world as it was, not as it is."
+
+      - alert: VoltageCoverageInputsUnreadable
+        expr: voltage_coverage_up == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Coverage inputs (classification feed / data map) cannot be read"
+          description: "voltage_coverage_up is 0: a file is missing, unreadable or not valid YAML/CSV. Coverage metrics are stale until fixed; check exporter logs."

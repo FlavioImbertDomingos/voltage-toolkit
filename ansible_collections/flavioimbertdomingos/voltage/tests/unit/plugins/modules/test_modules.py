@@ -147,3 +147,47 @@ def test_policy_facts_and_probe_against_mock(mock_server):
     r = run_module("voltage_probe", dict(common, fail_on_error=False))
     assert not r["ok"] and not r.get("failed")
     mod._state["scenario"] = "healthy"
+
+
+# --------------------------------------------------------------------- voltage_coverage (R6, R7)
+def test_coverage_module(tmp_path):
+    feed = tmp_path / "classification.csv"
+    feed.write_text(
+        "system,schema,table,column,classification,confidence\n"
+        "cards-db,public,customers,pan,PAN,0.99\n"
+        "warehouse,dw,fact_orders,card_no,PAN,0.97\n"
+        "crm,,contacts,notes,FREE_TEXT,0.3\n"
+    )
+    dmap = tmp_path / "voltage-data-map.yml"
+    dmap.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "columns": [
+                    {"system": "cards-db", "schema": "public", "table": "customers", "column": "pan",
+                     "district": "prod", "format": "CC", "identities": ["payments@demo.bank"]},
+                ],
+            }
+        )
+    )  # fmt: skip
+    desired = tmp_path / "voltage-config.yml"
+    desired.write_text(yaml.safe_dump({"identities": {"payments@demo.bank": {"district": "prod", "formats": ["CC"]}}}))
+    r = run_module(
+        "voltage_coverage",
+        dict(
+            classification_csv=str(feed),
+            data_map=str(dmap),
+            desired_state=str(desired),
+            policy_formats={"prod": ["CC", "SSN", "ORA-DATE"]},
+            min_confidence=0.8,
+        ),
+    )
+    assert not r.get("failed"), r
+    rep = r["report"]
+    assert rep["totals"] == {"protected": 1, "unmapped": 1, "broken": 0, "unknown": 1}
+    unmapped = [c for c in rep["columns"] if c["state"] == "unmapped"]
+    assert unmapped[0]["column"] == "warehouse.dw.fact_orders.card_no"
+    assert rep["dead_formats"] == {"prod": ["ORA-DATE", "SSN"]}
+    # missing input -> clean failure
+    r = run_module("voltage_coverage", dict(classification_csv="/nope.csv", data_map=str(dmap), policy_formats={}))
+    assert r.get("failed") and "does not exist" in r["msg"]

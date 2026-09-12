@@ -17,6 +17,7 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 from . import __version__
 from .config import Config
+from .coverage import STATES, CoverageReport
 from .fleet import FleetCheck
 from .fleet import evaluate as evaluate_fleet
 from .lifecycle import split_version, support_end
@@ -117,6 +118,31 @@ fleet_odd = Gauge(
     "1 if this target disagrees with the fleet majority for the check",
     ["fleet", "check", "key", "target"],
 )
+
+# ---- coverage (R6, R7): classified sensitive columns x data map x live policy
+coverage_columns = Gauge(
+    f"{NS}_coverage_columns",
+    "Classified sensitive columns by state (protected | unmapped | broken | unknown)",
+    ["state", "classification"],
+)
+coverage_column_info = Gauge(
+    f"{NS}_coverage_column_info",
+    "One series per column that is NOT protected (capped by coverage.max_named_columns)",
+    ["state", "system", "schema", "table", "column", "classification", "reason"],
+)
+coverage_dead_format = Gauge(
+    f"{NS}_coverage_dead_format",
+    "1 for a format the policy offers that no column and no identity uses",
+    ["district", "format"],
+)
+coverage_feed_rows = Gauge(f"{NS}_coverage_feed_rows", "Rows in the classification feed")
+coverage_map_entries = Gauge(f"{NS}_coverage_map_entries", "Entries in the data map")
+coverage_unclassified_mappings = Gauge(
+    f"{NS}_coverage_unclassified_mappings", "Data-map entries the classification feed never mentioned"
+)
+coverage_feed_mtime = Gauge(f"{NS}_coverage_feed_mtime_seconds", "Modification time of the classification feed")
+coverage_errors = Gauge(f"{NS}_coverage_errors", "Parse/consistency errors in the feed or data map")
+coverage_ok = Gauge(f"{NS}_coverage_up", "1 if the feed and data map were read and evaluated")
 
 # ---- tls / key servers
 cert_expiry = Gauge(f"{NS}_certificate_expiry_timestamp_seconds", "Certificate notAfter", ["target", "host", "subject"])
@@ -252,6 +278,42 @@ def apply_fleet(checks: list[FleetCheck], all_targets: list[str] | None = None) 
             log.error("[fleet %s] %s %s: %s", c.fleet, c.check, c.key or "", c.detail)
 
 
+def apply_coverage(report: CoverageReport | None, feed_mtime: float | None, max_named: int = 50) -> None:
+    coverage_column_info.clear()
+    coverage_dead_format.clear()
+    if report is None:
+        coverage_ok.set(0.0)
+        return
+    coverage_ok.set(1.0)
+    coverage_feed_rows.set(float(report.feed_rows))
+    coverage_map_entries.set(float(report.map_entries))
+    coverage_unclassified_mappings.set(float(len(report.unclassified_mappings)))
+    coverage_errors.set(float(len(report.errors)))
+    if feed_mtime is not None:
+        coverage_feed_mtime.set(feed_mtime)
+    coverage_columns.clear()
+    classes = {c.row.classification or "unclassified" for c in report.columns} or {"unclassified"}
+    for st in STATES:  # every (state, class) exists at 0 so absence reads as 0, not "no data"
+        for cl in classes:
+            coverage_columns.labels(st, cl).set(0.0)
+    for (st, cl), n in report.counts().items():
+        coverage_columns.labels(st, cl).set(float(n))
+    named = 0
+    for c in report.columns:
+        if c.state == "protected":
+            continue
+        if named >= max_named:
+            break
+        named += 1
+        r = c.row
+        coverage_column_info.labels(c.state, r.system, r.schema, r.table, r.column, r.classification, c.reason).set(1.0)
+    for district, fmts in report.dead_formats.items():
+        for f in fmts:
+            coverage_dead_format.labels(district, f).set(1.0)
+    for e in report.errors:
+        log.warning("coverage: %s", e)
+
+
 def probe_loop(config: Config, stop: threading.Event) -> None:
     configure(config)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(config.targets)))) as pool:
@@ -261,6 +323,11 @@ def probe_loop(config: Config, stop: threading.Event) -> None:
             for res in results:
                 apply(res)
             apply_fleet(evaluate_fleet(results), [t.name for t in config.targets if t.fleet])
+            if config.coverage:
+                from .coverage_runner import run_coverage
+
+                rep, mtime = run_coverage(config.coverage, results)
+                apply_coverage(rep, mtime, config.coverage.max_named_columns)
             cycles.inc()
             elapsed = time.perf_counter() - started
             log.info("probe cycle done in %.2fs (%d target(s))", elapsed, len(config.targets))

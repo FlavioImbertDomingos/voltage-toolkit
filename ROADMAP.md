@@ -22,7 +22,9 @@ data only, no production values.
 | R3 silent-corruption probes | ✅ shipped — `feat: silent-corruption probes` |
 | R4 policy propagation lag | ✅ shipped — `feat: fleet agreement` |
 | R5 eFPE awareness | ✅ shipped — detection in `feat: policy intelligence`, determinism exclusion in `feat: silent-corruption probes` |
-| R6–R9 coverage / SDM seam | next |
+| R6 coverage metrics | ✅ shipped — `feat: coverage` |
+| R7 data map | ✅ shipped — `feat: coverage` |
+| R8–R9 masking probes / batch jobs | next |
 | R10–R11, R13–R14, R16 | planned |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
 | R15 cross-region token equivalence | ✅ shipped — `feat: fleet agreement` |
@@ -111,7 +113,7 @@ value?"* Structured Data Manager and Core Data Discovery & Risk Insights answer 
 sensitive data live, and is it classified, masked, retained or archived?"* Nobody monitors the
 seam, and the seam is where audits are failed.
 
-### R6. Coverage metrics from a classification feed · **M**
+### R6. Coverage metrics from a classification feed · **M** · ✅ shipped
 
 Discovery output is a list of columns classified as PAN / SSN / PII. Join it against the policy
 facts and the keycensus inventory and emit
@@ -124,10 +126,11 @@ a plain CSV contract (`system,schema,table,column,classification,confidence`) so
 SDM, Core Data Discovery, or a hand-built inventory — do not couple to a product with no public
 API.
 
-*Design note:* the inventory join arguably belongs in **keycensus**, with the exporter reading
-its output. Decide before building; do not duplicate the inventory model in two repos.
+*Design note, resolved:* keycensus inventories keys, certificates and endpoints; coverage is
+about data columns. The join lives here (`coverage.py`, shared with the collection); keycensus
+can consume its output.
 
-### R7. `voltage-data-map.yml` in config-as-code · **S**
+### R7. `voltage-data-map.yml` in config-as-code · **S** · ✅ shipped
 
 `voltage-config.yml` already declares districts, formats, identities and auth methods. Add a
 data map: column → format → district → consuming identity. Then `voltage_policy_audit` drifts in

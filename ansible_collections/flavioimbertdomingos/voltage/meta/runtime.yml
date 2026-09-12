@@ -3,6 +3,7 @@ action_groups:
   voltage:
     - voltage_policy_facts
     - voltage_probe
+    - voltage_coverage
     - voltage_identity
     - voltage_district
     - voltage_auth_method

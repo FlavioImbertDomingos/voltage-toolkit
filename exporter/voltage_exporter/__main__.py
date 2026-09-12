@@ -86,6 +86,27 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{t.name}] keyserver {url}: {'up' if up else 'DOWN'}")
         from .fleet import evaluate as evaluate_fleet
 
+        if config.coverage:
+            from .coverage_runner import run_coverage
+
+            rep, _ = run_coverage(config.coverage, results)
+            if rep is None:
+                print("[coverage] could not read the classification feed / data map")
+                rc = 1
+            else:
+                t = rep.to_dict()["totals"]
+                print(
+                    f"[coverage] {rep.feed_rows} classified columns: {t['protected']} protected, "
+                    f"{t['unmapped']} unmapped, {t['broken']} broken, {t['unknown']} unknown"
+                )
+                for c in rep.columns:
+                    if c.state in ("unmapped", "broken"):
+                        print(f"[coverage] {c.state.upper()} {c.row.qualified} ({c.row.classification}): {c.reason}")
+                        rc = rc or 1
+                for d, fmts in rep.dead_formats.items():
+                    print(f"[coverage] dead formats in {d}: {', '.join(fmts)}")
+                for e in rep.errors:
+                    print(f"[coverage] error: {e}")
         for c in evaluate_fleet(results):
             state = "agree" if c.ok else ("DIVERGED " + c.detail if c.ok is False else f"n/a ({c.detail})")
             print(f"[fleet {c.fleet}] {c.check}{(' ' + c.key) if c.key else ''} ({c.members} members): {state}")

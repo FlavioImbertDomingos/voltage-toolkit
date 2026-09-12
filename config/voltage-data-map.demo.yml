@@ -1,0 +1,32 @@
+# Data map: which column is protected by which district / format, and who may use it.
+# Config-as-code -- commit it. The exporter joins it with the classification feed and the
+# live policy; the audit role reports the same join every night.
+#
+# warehouse.dw.fact_orders.card_no is classified PAN in classification.demo.csv and has NO
+# entry here on purpose: that is the "a new sensitive column appeared and nothing protects
+# it" finding, visible from the first scrape like the 20-day certificate.
+version: 1
+columns:
+  - system: cards-db
+    schema: public
+    table: customers
+    column: pan
+    classification: PAN
+    district: prod
+    format: CC
+    identities: [payments@demo.bank]
+  - system: cards-db
+    schema: public
+    table: customers
+    column: ssn
+    classification: SSN
+    district: prod
+    format: SSN
+    identities: [crm@demo.bank]
+  - system: crm
+    table: contacts
+    column: ssn
+    classification: SSN
+    district: prod
+    format: SSN
+    identities: [crm@demo.bank]

@@ -3,6 +3,12 @@ exporter:
   port: 9743
   interval_seconds: 15
 
+# Is every classified sensitive column actually protected? (see docs/COVERAGE.md)
+coverage:
+  classification_csv: /config/classification.csv
+  data_map: /config/voltage-data-map.yml
+  min_confidence: 0.8
+
 targets:
   - name: demo-prod
     policy_url: https://voltage:8443/policy/clientPolicy.xml

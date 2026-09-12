@@ -63,6 +63,11 @@
   register: _probe
   when: voltage_audit_probe | bool and voltage_audit_probe_identity | length > 0
 
+- name: "{{ _district }}: remember live formats for coverage"
+  ansible.builtin.set_fact:
+    _voltage_live_formats: "{{ (_voltage_live_formats | default({})) | combine({_district: (_live.policy.format_names | default([]))}) }}"
+  when: not (_live.failed | default(false))
+
 - name: "{{ _district }}: record"
   ansible.builtin.set_fact:
     voltage_audit_results: >-

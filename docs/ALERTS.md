@@ -19,6 +19,11 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltagePolicyFleetDivergent` | fleet members serve different policy configuration | 10m | warning | Lazy per-node propagation is normal for minutes, not tens of minutes |
 | `VoltageFleetKeyTableSkew` | `currentNumber` differs across members | 10m | warning | A rotation reached some members only; finish or roll back before any failover |
 | `VoltageFleetVersionSkew` | members on different appliance versions | 30m | info | Fine mid-upgrade, not as steady state |
+| `VoltageUnprotectedSensitiveColumn` | classified column with no data-map entry | 30m | warning | **PCI scope drift.** Map it or dispute the classification; named in `voltage_coverage_column_info` |
+| `VoltageBrokenProtectionMapping` | mapped, but format not offered / identity not declared or not allowed | 10m | critical | The app believes it tokenizes; the appliance will refuse. Fix the map, the policy or the identity |
+| `VoltageDeadFormat` | format offered, used by nothing | 24h | info | Retire it or map what uses it |
+| `VoltageClassificationFeedStale` | feed older than 7 days | — | warning | Coverage is only as current as discovery |
+| `VoltageCoverageInputsUnreadable` | `voltage_coverage_up == 0` | 15m | warning | Missing/invalid feed or data map; see exporter logs |
 | `VoltageErrorRateHigh` | > 5 % failures over 10m | 5m | warning | Intermittent errors apps are retrying around |
 | `VoltageLatencyHigh` | p95 protect > 500 ms | 5m | warning | Appliance load, key server, network path, key rotation in progress |
 | `VoltageFormatNotPreserved` | token shape ≠ sample shape | 2m | warning | Wrong format bound to the identity, or a tokenization format used where FPE expected |

@@ -14,6 +14,7 @@ ansible-galaxy collection install git+https://github.com/FlavioImbertDomingos/vo
 |---|---|---|---|
 | `voltage_policy_facts` | module | no | Downloads and parses `clientPolicy.xml`: formats, auth methods, key servers, version, hash |
 | `voltage_probe` | module | yes (probe identity) | protect → access round-trip with a synthetic sample; latency; fails on mismatch |
+| `voltage_coverage` | Join a classification feed with `voltage-data-map.yml` and live policies: protected / unmapped / broken / unknown per column, dead formats. See `docs/COVERAGE.md` |
 | `voltage_district` | module | no | Declares a district's expected formats / auth methods / key servers |
 | `voltage_identity` | module | no | Declares an identity (district, auth method, formats, owner, secret *reference*) |
 | `voltage_auth_method` | module | no | Declares an auth method and its settings (LDAP URL, rotation period ...) |
