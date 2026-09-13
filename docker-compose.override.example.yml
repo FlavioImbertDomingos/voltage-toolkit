@@ -1,0 +1,25 @@
+# Copy to docker-compose.override.yml to point the stack at real PagerDuty and Splunk.
+# Compose merges it automatically. Then delete the two `url:` lines marked DEMO in
+# alertmanager/alertmanager.yml so PagerDuty events go to events.pagerduty.com.
+services:
+  alertmanager:
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # a directory holding pagerduty.key, splunk.token, splunk.url -- from your secrets manager,
+      # never from the repo
+      - /run/secrets/voltage-alertmanager:/etc/alertmanager/secrets:ro
+    depends_on: []
+
+  voltage-exporter:
+    environment:
+      VOLTAGE_EXPORTER_LOG_FORMAT: json
+    # ship container stdout to Splunk with the Docker logging driver …
+    logging:
+      driver: splunk
+      options:
+        splunk-url: https://splunk.example.bank:8088
+        splunk-token: ${SPLUNK_HEC_TOKEN}
+        splunk-sourcetype: voltage-exporter
+        splunk-index: security
+        splunk-format: json
+    # … or leave the default json-file driver and let a Universal Forwarder / OTel collector tail it.

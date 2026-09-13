@@ -21,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="voltage-exporter", description="Synthetic-probe exporter for Voltage SecureData")
     ap.add_argument("-c", "--config", default=os.environ.get("VOLTAGE_EXPORTER_CONFIG", "/config/voltage-exporter.yml"))
     ap.add_argument("--once", action="store_true", help="run one probe cycle, print a summary, exit (no HTTP server)")
+    ap.add_argument(
+        "--log-format", choices=["text", "json"], help="override exporter.log_format (json: one event per line)"
+    )
     ap.add_argument("--version", action="version", version=__version__)
     args = ap.parse_args(argv)
 
@@ -29,11 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ConfigError, FileNotFoundError) as exc:
         print(f"voltage-exporter: configuration error: {exc}", file=sys.stderr)
         return 2
-    logging.basicConfig(
-        level=getattr(logging, config.log_level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    from .structured import configure_logging
+
+    configure_logging(config.log_level, args.log_format or config.log_format)
 
     if args.once:
         from .probes import run_target

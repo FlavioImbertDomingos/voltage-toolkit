@@ -27,6 +27,7 @@ data only, no production values.
 | R8 masking-quality probes | ✅ shipped — `feat: sdm checks` |
 | R9 batch-job exporter | ✅ shipped — `feat: sdm checks` (inside voltage-exporter, not a sibling repo) |
 | R16 console reachability | next |
+| R17 enterprise integrations | ✅ shipped — `feat: enterprise integrations` |
 | R10–R11, R13–R14 | planned |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
 | R15 cross-region token equivalence | ✅ shipped — `feat: fleet agreement` |
@@ -261,6 +262,23 @@ is what the upgrade path backs up, which has its own documented failure mode.
 Ship: `voltage_console_up` as a distinct series from `voltage_keyserver_up`, with a
 lower-severity alert and a runbook line saying plainly that protection is unaffected. Monitoring
 that cries "Voltage is down" for a control-plane outage trains people to ignore it.
+
+### R17. Enterprise integrations: PagerDuty and Splunk · **S** · ✅ shipped
+
+A bank does not run Grafana and Alertmanager as the system of record. It runs a paging platform
+and a SIEM, and the platform team's question is "does your thing feed ours cleanly?" The answer
+should be yes without the toolkit learning a single vendor name.
+
+Shipped: Alertmanager receivers for **PagerDuty** (Events API v2, key from a file, severity /
+class / component mapped from labels, auto-resolve) and **Splunk** (HEC raw endpoint, token from a
+file, every alert via a `continue: true` route so Splunk has the full firing/resolved history);
+`log_format: json` in the exporter — one structured event per target per cycle, hashes and
+booleans only — for a log forwarder; a commented `remote_write` stanza for metrics; and a
+stdlib **mock** of both APIs so the compose stack proves delivery end to end (CI asserts the
+seeded `SDMMaskLeak` reached both). `docs/INTEGRATIONS.md` has the Splunk searches worth keeping.
+
+Deliberately not done: a Splunk app / dashboards XML, and PagerDuty service provisioning via
+Terraform. Both are the platform team's, not the toolkit's.
 
 ---
 

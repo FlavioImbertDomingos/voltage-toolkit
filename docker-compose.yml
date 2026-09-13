@@ -88,6 +88,7 @@ services:
     environment:
       VOLTAGE_EXPORTER_CONFIG: /config/voltage-exporter.yml
       VOLTAGE_EXPORTER_INTERVAL: ${VOLTAGE_EXPORTER_INTERVAL:-15}
+      VOLTAGE_EXPORTER_LOG_FORMAT: ${VOLTAGE_EXPORTER_LOG_FORMAT:-json}   # one event per target per cycle
       VOLTAGE_SHARED_SECRET: ${VOLTAGE_SHARED_SECRET:-probe-secret}
       VOLTAGE_PASSWORD: ${VOLTAGE_PASSWORD:-changeme}
     volumes:
@@ -123,8 +124,20 @@ services:
     container_name: alertmanager
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # demo keys pointing at mock-integrations; mount your own directory here in production
+      - ./alertmanager/secrets:/etc/alertmanager/secrets:ro
     ports:
       - "9093:9093"
+    depends_on: [mock-integrations]
+
+  # Pretend PagerDuty (Events API v2) and Splunk (HTTP Event Collector). Records what Alertmanager
+  # delivers: curl localhost:8900/received?kind=pagerduty
+  mock-integrations:
+    build: ./mock-integrations
+    image: voltage-toolkit/mock-integrations:latest
+    container_name: mock-integrations
+    ports:
+      - "8900:8900"
 
   grafana:
     image: grafana/grafana:12.1.0

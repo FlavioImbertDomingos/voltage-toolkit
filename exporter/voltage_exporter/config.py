@@ -126,6 +126,7 @@ class Config:
     listen: str = "0.0.0.0"
     interval: float = 30.0
     log_level: str = "INFO"
+    log_format: str = "text"  # text | json (one object per line, for a SIEM forwarder)
     support_end: dict = field(default_factory=dict)  # version prefix -> ISO date | {release, end}
     coverage: CoverageConfig | None = None
     sdm: dict | None = None  # raw `sdm:` block; parsed by sdm.parse_config (masking checks, jobs)
@@ -244,6 +245,7 @@ def load(path: str | Path) -> Config:
         listen=str(ex.get("listen", "0.0.0.0")),
         interval=float(os.environ.get("VOLTAGE_EXPORTER_INTERVAL", ex.get("interval_seconds", 30))),
         log_level=str(os.environ.get("VOLTAGE_EXPORTER_LOG_LEVEL", ex.get("log_level", "INFO"))),
+        log_format=str(os.environ.get("VOLTAGE_EXPORTER_LOG_FORMAT", ex.get("log_format", "text"))).lower(),
         support_end={str(k): v for k, v in (ex.get("support_end") or {}).items()},
         coverage=cov,
         sdm=raw.get("sdm") or None,

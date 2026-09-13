@@ -24,6 +24,7 @@ from .lifecycle import split_version, support_end
 from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
 from .probes import TargetResult, run_target
 from .sdm import JobResult, MaskResult
+from .structured import EVENT_ATTR, summary_line, target_event
 
 log = logging.getLogger(__name__)
 NS = "voltage"
@@ -385,6 +386,8 @@ def probe_loop(config: Config, stop: threading.Event) -> None:
             results = list(pool.map(run_target, config.targets))
             for res in results:
                 apply(res)
+                ev = target_event(res)
+                log.info(summary_line(ev), extra={EVENT_ATTR: ev})
             apply_fleet(evaluate_fleet(results), [t.name for t in config.targets if t.fleet])
             if config.coverage:
                 from .coverage_runner import run_coverage

@@ -26,8 +26,8 @@ jobs:
           pip install ruff
           pip install -e "./exporter[test]"
       - run: |
-          ruff check exporter mock-voltage grafana demo
-          ruff format --check exporter mock-voltage grafana demo
+          ruff check exporter mock-voltage mock-integrations grafana demo
+          ruff format --check exporter mock-voltage mock-integrations grafana demo
       - run: cd exporter && python -m pytest -q
       - name: policy.py and coverage.py are identical in exporter and collection
         run: |
@@ -79,6 +79,7 @@ jobs:
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check rules /p/alerts/voltage.rules.yml
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check config /p/prometheus.yml
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 test rules /p/alerts/voltage.rules.test.yml
+          docker run --rm -v "$PWD/alertmanager:/a:ro" --entrypoint amtool prom/alertmanager:v0.28.1 check-config /a/alertmanager.yml
 
   compose-smoke:
     name: docker compose smoke test
@@ -114,6 +115,22 @@ jobs:
           echo "$M" | grep -q 'voltage_sdm_mask_ok{check="nonprod-pan-ri",kind="consistency"} 1.0'
           echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="mask-nonprod-refresh"} 1.0'
           echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="archive-orders-2019"} 0.0'
+      - name: Structured log events from the exporter
+        run: |
+          docker compose logs voltage-exporter | grep -m1 '"event":"probe","target":"demo-prod"' | grep -q '"policy_ok":true'
+      - name: Alerts reach PagerDuty and Splunk (mock)
+        run: |
+          for i in $(seq 1 40); do
+            PD=$(curl -sf 'http://localhost:8900/received?kind=pagerduty')
+            if echo "$PD" | grep -q '"event_action": "trigger"' && echo "$PD" | grep -q 'MASKING LEAK'; then break; fi
+            sleep 3
+          done
+          echo "$PD" | grep -q '"event_action": "trigger"' || { docker compose logs alertmanager mock-integrations; exit 1; }
+          echo "$PD" | grep -q '"severity": "critical"'
+          echo "$PD" | grep -q '"class": "SDMMaskLeak"'
+          SP=$(curl -sf 'http://localhost:8900/received?kind=splunk')
+          echo "$SP" | grep -q '"ok": true'
+          echo "$SP" | grep -q 'SDMMaskLeak'
       - name: Fleet agrees, then DR diverges
         run: |
           M=$(curl -sf http://localhost:9743/metrics)
