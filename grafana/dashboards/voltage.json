@@ -103,7 +103,8 @@
           "expr": "min(voltage_policy_up{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R3",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -168,7 +169,8 @@
           "expr": "min(voltage_keyserver_up{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R5",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -233,7 +235,8 @@
           "expr": "sum(voltage_tokenize_success{target=~\"$target\"}) / count(voltage_tokenize_success{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R7",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -292,7 +295,8 @@
           "expr": "min(voltage_tokenize_roundtrip_ok{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R9",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -357,7 +361,8 @@
           "expr": "max(voltage:protect_p95_seconds_10m{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R11",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -417,7 +422,8 @@
           "expr": "max(voltage:tokenize_error_ratio_10m{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R13",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -477,7 +483,8 @@
           "expr": "min(voltage:certificate_days_until_expiry{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R15",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -541,7 +548,8 @@
           "expr": "sum(voltage_policy_formats{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R17",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -591,7 +599,8 @@
           "expr": "sum(increase(voltage_policy_changes_total{target=~\"$target\"}[24h]))",
           "legendFormat": "__auto",
           "refId": "R19",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -645,7 +654,8 @@
           "expr": "max(voltage_probe_cycle_seconds{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R21",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -697,7 +707,8 @@
           "expr": "time() - max(voltage_probe_last_run_timestamp_seconds{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R23",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -757,7 +768,8 @@
           "expr": "min(voltage_integrity_ok{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R25",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1099,7 +1111,9 @@
           "expr": "voltage_policy_format{target=~\"$target\"}",
           "legendFormat": "__auto",
           "refId": "R39",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1116,8 +1130,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1144,7 +1166,9 @@
           "expr": "sort(voltage:certificate_days_until_expiry{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R41",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1163,8 +1187,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1191,7 +1223,9 @@
           "expr": "voltage_policy_info{target=~\"$target\"}",
           "legendFormat": "__auto",
           "refId": "R43",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1208,8 +1242,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1249,7 +1291,8 @@
           "expr": "sum(voltage_format_below_minimum_domain{target=~\"$target\"}) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R46",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1303,7 +1346,8 @@
           "expr": "count(voltage_policy_format_efpe{target=~\"$target\"}) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R48",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1353,7 +1397,8 @@
           "expr": "sum(increase(voltage_key_rotations_total{target=~\"$target\"}[24h])) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R50",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1403,7 +1448,8 @@
           "expr": "min(voltage_key_current_size_bits{target=~\"$target\"} > 0)",
           "legendFormat": "__auto",
           "refId": "R52",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1457,7 +1503,8 @@
           "expr": "min(voltage:support_days_remaining{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R54",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1516,7 +1563,9 @@
           "expr": "voltage_key_table_current_number{target=~\"$target\"}",
           "legendFormat": "__auto",
           "refId": "R56",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1535,8 +1584,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1563,7 +1620,9 @@
           "expr": "sort(voltage_format_domain_size{target=~\"$target\"})",
           "legendFormat": "__auto",
           "refId": "R58",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1582,8 +1641,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1610,7 +1677,9 @@
           "expr": "voltage_appliance_version_info{target=~\"$target\"}",
           "legendFormat": "__auto",
           "refId": "R60",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1627,8 +1696,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1668,7 +1745,8 @@
           "expr": "min(voltage_fleet_agreement{check=\"token\"})",
           "legendFormat": "__auto",
           "refId": "R63",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1733,7 +1811,8 @@
           "expr": "min(voltage_fleet_agreement{check=\"policy\"})",
           "legendFormat": "__auto",
           "refId": "R65",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1798,7 +1877,8 @@
           "expr": "min(voltage_fleet_agreement{check=\"key_table\"})",
           "legendFormat": "__auto",
           "refId": "R67",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1863,7 +1943,8 @@
           "expr": "min(voltage_fleet_agreement{check=\"version\"})",
           "legendFormat": "__auto",
           "refId": "R69",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -1928,7 +2009,9 @@
           "expr": "voltage_fleet_member_diverged == 1",
           "legendFormat": "__auto",
           "refId": "R71",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -1945,8 +2028,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -1986,7 +2077,8 @@
           "expr": "sum(voltage_coverage_columns{state=\"unmapped\"}) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R74",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2040,7 +2132,8 @@
           "expr": "sum(voltage_coverage_columns{state=\"broken\"}) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R76",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2094,7 +2187,8 @@
           "expr": "sum(voltage_coverage_columns{state=\"protected\"}) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R78",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2144,7 +2238,8 @@
           "expr": "count(voltage_coverage_dead_format == 1) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R80",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2194,7 +2289,8 @@
           "expr": "voltage:coverage_feed_age_days",
           "legendFormat": "__auto",
           "refId": "R82",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2253,7 +2349,9 @@
           "expr": "voltage_coverage_column_info",
           "legendFormat": "__auto",
           "refId": "R84",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -2270,8 +2368,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -2311,7 +2417,8 @@
           "expr": "count(voltage_sdm_mask_ok == 0) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R87",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2365,7 +2472,8 @@
           "expr": "sum(voltage_sdm_job_stale) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R89",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2419,7 +2527,8 @@
           "expr": "sum(voltage_sdm_job_failing) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R91",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2473,7 +2582,8 @@
           "expr": "count(voltage_sdm_check_up == 0) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R93",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -2527,7 +2637,9 @@
           "expr": "voltage_sdm_mask_ok",
           "legendFormat": "__auto",
           "refId": "R95",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -2546,8 +2658,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     },
@@ -2574,7 +2694,9 @@
           "expr": "sort_desc(voltage:sdm_job_hours_since_success)",
           "legendFormat": "__auto",
           "refId": "R97",
-          "instant": true
+          "instant": true,
+          "range": false,
+          "format": "table"
         }
       ],
       "transformations": [
@@ -2593,8 +2715,16 @@
           }
         }
       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
         "overrides": []
       }
     }

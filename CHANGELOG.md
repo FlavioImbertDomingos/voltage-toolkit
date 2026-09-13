@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- Grafana: table panels (formats, certificates, key tables, domain sizes, fleet, coverage, SDM) rendered a raw
+  label-set string with a frame picker instead of rows — the instant queries lacked `format: table`. All tables now
+  query as `table`, are filterable, and drop `Time`/`__name__`/`job`/`instance` columns.
+- Grafana / Prometheus: "Error rate (10m)", "Error ratio by format" and "Failures by kind" showed *No data* until the
+  first failure ever happened. The exporter now pre-creates `voltage_tokenize_probes_total{result="failure"}` and every
+  `voltage_tokenize_errors_total{kind=…}` series at 0, and `voltage:tokenize_error_ratio_10m` falls back to `0 × total`
+  so a target that never failed reports 0 % instead of nothing (promtool test added).
+
 ### Added
 - **SDM checks** (roadmap R8, R9): masking quality (`leak` via planted canaries — heuristic off by default and
   documented why — `consistency`, `constant`) and job health (stale / failing per job) read from masked non-prod data
