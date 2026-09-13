@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="690" viewBox="0 70 1280 690" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="820" viewBox="0 70 1280 820" font-family="Helvetica, Arial, sans-serif">
   <defs>
     <style>
       .h1   { font-size:26px; font-weight:700; fill:#1a1a1a; }
@@ -16,7 +16,7 @@
     <marker id="ahb" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1f4e99"/></marker>
     <marker id="ahg" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8a6410"/></marker>
   </defs>
-  <rect y="70" width="1280" height="690" fill="#ffffff"/>
+  <rect y="70" width="1280" height="820" fill="#ffffff"/>
 
   <!-- Voltage appliance -->
   <rect x="30" y="120" width="300" height="366" rx="10" fill="#f6ecf7" stroke="#7a3489" stroke-width="2.5"/>
@@ -44,7 +44,7 @@
   <text x="460" y="290" class="s">both latencies · round-trip equality · shape kept</text>
   <text x="460" y="324" class="s" font-weight="700">3. TLS handshake, every host</text>
   <text x="460" y="344" class="s">certificate notAfter — the #1 cause of “it all stopped”</text>
-  <text x="460" y="378" class="s" font-weight="700">4. GET each key server</text>
+  <text x="460" y="530" class="s" font-weight="700">4. GET each key server</text>
   <text x="460" y="412" class="s" font-weight="700">5. read what the policy says about the crypto</text>
   <text x="460" y="432" class="s">key tables · domain sizes · eFPE · version (step 1's file)</text>
   <text x="460" y="460" class="s" font-weight="700">6. fleet agreement · coverage join · SDM checks</text>
@@ -56,27 +56,37 @@
   <path class="arr" d="M440 350 H330"/>
   <text x="385" y="112" text-anchor="middle" class="cap">read-only, synthetic samples only</text>
 
-  <!-- prometheus stack -->
-  <rect x="930" y="120" width="320" height="168" rx="10" fill="#eef2f7" stroke="#8fa3b8" stroke-width="2.5"/>
-  <text x="1090" y="156" text-anchor="middle" class="h2">Prometheus</text>
-  <text x="1090" y="182" text-anchor="middle" class="s">48 alert rules, promtool-tested</text>
-  <text x="1090" y="204" text-anchor="middle" class="s">recording rules for p95, error ratio,</text>
-  <text x="1090" y="224" text-anchor="middle" class="s">days-to-expiry, days-of-support</text>
-  <text x="1090" y="252" text-anchor="middle" class="cap">→ Alertmanager (routing, inhibition) → Grafana</text>
-  <text x="1090" y="272" text-anchor="middle" class="cap">→ PagerDuty Events v2 · Splunk HEC</text>
-  <path class="arr" d="M820 195 H930"/>
-  <text x="875" y="186" text-anchor="middle" class="mono">/metrics</text>
-  <text x="875" y="214" text-anchor="middle" class="cap">+ JSON events</text>
-  <text x="875" y="230" text-anchor="middle" class="cap">to the SIEM</text>
+  <!-- prometheus -->
+  <rect x="910" y="120" width="340" height="120" rx="10" fill="#eef2f7" stroke="#8fa3b8" stroke-width="2.5"/>
+  <text x="1080" y="152" text-anchor="middle" class="h2">Prometheus</text>
+  <text x="1080" y="178" text-anchor="middle" class="s">48 alert rules, promtool-tested</text>
+  <text x="1080" y="200" text-anchor="middle" class="s">recording rules for p95, error ratio,</text>
+  <text x="1080" y="220" text-anchor="middle" class="s">days-to-expiry, days-of-support</text>
+  <path class="arr" d="M820 180 H910"/>
+  <text x="865" y="171" text-anchor="middle" class="mono">/metrics</text>
+
+  <!-- where the answers go -->
+  <rect x="910" y="256" width="340" height="196" rx="10" fill="#fdf2f2" stroke="#c2410c" stroke-width="2.5"/>
+  <text x="1080" y="286" text-anchor="middle" class="h2">where the answers go</text>
+  <text x="930" y="314" class="s"><tspan font-weight="700">Alertmanager</tspan> — routing, inhibition</text>
+  <text x="944" y="336" class="s">→ <tspan font-weight="700" fill="#b3261e">PagerDuty</tspan> Events v2 (pages)</text>
+  <text x="944" y="358" class="s">→ <tspan font-weight="700" fill="#1e6b45">Splunk HEC</tspan> (firing + resolved)</text>
+  <text x="944" y="380" class="s">→ Slack / email (the rest)</text>
+  <text x="930" y="408" class="s"><tspan font-weight="700">Grafana</tspan> — is it broken right now?</text>
+  <text x="930" y="430" class="s"><tspan font-weight="700" fill="#1e6b45">Splunk app</tspan> — probe events + alert audit</text>
+  <path class="arr" d="M1080 240 V248"/>
+  <path d="M820 208 H880 V300 H902" stroke="#1e6b45" stroke-width="2.5" fill="none" stroke-dasharray="6 5" marker-end="url(#ah)"/>
+  <text x="836" y="252" text-anchor="middle" class="cap" font-size="13px">JSON events</text>
+  <text x="836" y="268" text-anchor="middle" class="cap" font-size="13px">per cycle</text>
 
   <!-- what the policy says (new) -->
-  <rect x="930" y="316" width="320" height="170" rx="10" fill="#fff8e8" stroke="#d8a838" stroke-width="2.5"/>
-  <text x="1090" y="350" text-anchor="middle" class="h2">from the policy file alone</text>
-  <text x="950" y="378" class="s">▸ currentNumber ↑ = a key rotated</text>
-  <text x="950" y="400" class="s">▸ radix^length under 10⁶ = weak format</text>
-  <text x="950" y="422" class="s">▸ eFPE = ciphertext differs per epoch</text>
-  <text x="950" y="444" class="s">▸ &lt;server version&gt; → support end date</text>
-  <path class="arrg" d="M820 420 H930"/>
+  <rect x="910" y="468" width="340" height="170" rx="10" fill="#fff8e8" stroke="#d8a838" stroke-width="2.5"/>
+  <text x="1080" y="502" text-anchor="middle" class="h2">from the policy file alone</text>
+  <text x="930" y="530" class="s">▸ currentNumber ↑ = a key rotated</text>
+  <text x="930" y="552" class="s">▸ radix^length under 10⁶ = weak format</text>
+  <text x="930" y="574" class="s">▸ eFPE = ciphertext differs per epoch</text>
+  <text x="930" y="596" class="s">▸ &lt;server version&gt; → support end date</text>
+  <path class="arrg" d="M820 420 H880 V520 H910"/>
 
   <!-- Ansible -->
   <rect x="30" y="500" width="790" height="150" rx="10" fill="#e8f0fb" stroke="#1f4e99" stroke-width="2.5"/>
@@ -88,12 +98,12 @@
   <path class="arrb" d="M180 500 V486"/>
 
   <!-- shared parser -->
-  <rect x="930" y="500" width="320" height="150" rx="10" fill="#f3f6f9" stroke="#b9c4d0"/>
-  <text x="1090" y="534" text-anchor="middle" class="h2">one parser, two homes</text>
-  <text x="1090" y="562" text-anchor="middle" class="mono">exporter/…/policy.py</text>
-  <text x="1090" y="584" text-anchor="middle" class="mono">module_utils/policy.py</text>
-  <text x="1090" y="612" text-anchor="middle" class="s">stdlib only, byte-identical,</text>
-  <text x="1090" y="632" text-anchor="middle" class="s">CI diffs them on every push</text>
+  <rect x="910" y="654" width="340" height="150" rx="10" fill="#f3f6f9" stroke="#b9c4d0"/>
+  <text x="1080" y="688" text-anchor="middle" class="h2">one parser, two homes</text>
+  <text x="1080" y="716" text-anchor="middle" class="mono">exporter/…/policy.py</text>
+  <text x="1080" y="738" text-anchor="middle" class="mono">module_utils/policy.py</text>
+  <text x="1080" y="766" text-anchor="middle" class="s">stdlib only, byte-identical,</text>
+  <text x="1080" y="786" text-anchor="middle" class="s">CI diffs them on every push</text>
 
-  <text x="640" y="710" text-anchor="middle" class="cap">docker compose up → two mock appliances + exporter + Prometheus + Alertmanager + Grafana + mock PagerDuty / Splunk. No licence needed. Break it on purpose with /mock/scenario/…</text>
+  <text x="640" y="850" text-anchor="middle" class="cap">docker compose up → two mock appliances + exporter + Prometheus + Alertmanager + Grafana + mock PagerDuty / Splunk. No licence needed. Break it on purpose with /mock/scenario/…</text>
 </svg>
