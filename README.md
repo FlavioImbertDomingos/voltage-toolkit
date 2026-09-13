@@ -92,7 +92,7 @@ docker compose up -d
 
 | What | Where |
 |---|---|
-| Grafana dashboard | http://localhost:3000 (admin / admin) |
+| Grafana dashboard | http://localhost:3000 (admin / admin) — every panel has an (i) tooltip; [docs/DASHBOARD.md](docs/DASHBOARD.md) walks through all of them |
 | Prometheus alerts | http://localhost:9090/alerts |
 | Raw metrics | http://localhost:9743/metrics |
 | The mock appliance's policy | https://localhost:8443/policy/clientPolicy.xml |
@@ -240,7 +240,7 @@ voltage-toolkit/
 ├── alertmanager/ · grafana/            routing, inhibition, PagerDuty + Splunk receivers (secrets/ = demo keys), generated dashboard
 ├── splunk/voltage_toolkit/             installable Splunk app: props, macros, scheduled searches, the SIEM dashboard
 ├── demo/                               seed_nonprod.py + canaries.txt: the pretend masked non-prod database
-└── docs/                               METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, VISIBILITY, ROOT-OF-TRUST, REAL-VOLTAGE, ARCHITECTURE, FAQ
+└── docs/                               DASHBOARD (every panel explained), METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, VISIBILITY, ROOT-OF-TRUST, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```
 
 ## Status & honesty

@@ -8,4 +8,6 @@ select = ["E", "F", "I", "B", "UP", "W"]
 [lint.per-file-ignores]
 # Dashboard builder is a table of panel definitions; long lines read better than wrapped ones.
 "grafana/build_dashboard.py" = ["E501"]
+# Prose: one panel description per entry; wrapping at 100 columns would make it unreadable to edit.
+"grafana/descriptions.py" = ["E501"]
 "mock-voltage/app.py" = ["E501"]

@@ -126,6 +126,11 @@ metric name, `voltage_identity_backup_restore_tested_timestamp_seconds`, is deli
 it is the one number in this project that, if it stops moving, means the data can be lost
 rather than merely unavailable.
 
+**Why the dashboard is generated (and documented) from Python:** `grafana/build_dashboard.py`
+owns the panels, `grafana/descriptions.py` owns the words. Each panel's description becomes the
+Grafana tooltip *and* a section of `docs/DASHBOARD.md`; a panel without an entry fails the build.
+Hand-edited dashboard JSON drifts from its documentation within a week; generated JSON cannot.
+
 ## Collection
 
 ```

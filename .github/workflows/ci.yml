@@ -80,6 +80,10 @@ jobs:
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check config /p/prometheus.yml
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 test rules /p/alerts/voltage.rules.test.yml
           docker run --rm -v "$PWD/alertmanager:/a:ro" --entrypoint amtool prom/alertmanager:v0.28.1 check-config /a/alertmanager.yml
+      - name: Dashboard JSON and docs/DASHBOARD.md are regenerated from the builder
+        run: |
+          python3 grafana/build_dashboard.py
+          git diff --exit-code -- grafana/dashboards/voltage.json docs/DASHBOARD.md
       - name: Splunk app is well-formed (XML + .conf)
         run: |
           python3 - <<'PY'
