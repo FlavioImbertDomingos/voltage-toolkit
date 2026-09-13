@@ -1,5 +1,9 @@
 # Architecture
 
+Two diagrams, both generated from SVG in this folder: `overview.svg` (the README hero — the three
+bands and where the answers go) and `architecture.svg` (the exporter's probe steps in detail).
+Edit the SVG, re-render the PNG (`cairosvg` or any browser), commit both.
+
 ## Exporter
 
 ```
