@@ -107,6 +107,24 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"[coverage] dead formats in {d}: {', '.join(fmts)}")
                 for e in rep.errors:
                     print(f"[coverage] error: {e}")
+        if config.sdm:
+            from .sdm import parse_config, run_job_check, run_mask_check
+
+            sc = parse_config(config.sdm)
+            for m in (run_mask_check(x) for x in sc.masking):
+                state = "ok" if m.ok else ("FAIL" if m.ok is False else "n/a")
+                tail = f" {m.detail}" if m.detail else ""
+                print(f"[sdm {m.check.name}] {m.check.kind}: {state} ({m.rows} rows){tail}")
+                rc = rc or (1 if m.ok is False else 0)
+            for j in (run_job_check(x) for x in sc.jobs):
+                state = "ok" if j.ok else ("FAIL" if j.ok is False else "n/a")
+                print(
+                    f"[sdm {j.check.name}] jobs: {state} ({len(j.jobs)} job(s)){(' ' + j.detail) if j.detail else ''}"
+                )
+                for js in j.jobs:
+                    when = time.strftime("%Y-%m-%d %H:%M", time.gmtime(js.finished_at)) if js.finished_at else "?"
+                    print(f"[sdm {j.check.name}]   {js.job}: {js.status} at {when}, rows={js.rows}")
+                rc = rc or (1 if j.ok is False else 0)
         for c in evaluate_fleet(results):
             state = "agree" if c.ok else ("DIVERGED " + c.detail if c.ok is False else f"n/a ({c.detail})")
             print(f"[fleet {c.fleet}] {c.check}{(' ' + c.key) if c.key else ''} ({c.members} members): {state}")

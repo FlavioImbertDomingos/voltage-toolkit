@@ -328,6 +328,45 @@ panels = [
         thr=thresholds(("green", None), ("orange", 7), ("red", 30)),
     ),
     table("Columns not protected", "voltage_coverage_column_info", 0, 71, h=7),
+    row("Structured Data Manager — masked data and jobs", 78),
+    stat(
+        "Masking checks failing",
+        "count(voltage_sdm_mask_ok == 0) or vector(0)",
+        0,
+        79,
+        thr=thresholds(("green", None), ("red", 1)),
+    ),
+    stat(
+        "Jobs stale",
+        "sum(voltage_sdm_job_stale) or vector(0)",
+        4,
+        79,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Jobs failing",
+        "sum(voltage_sdm_job_failing) or vector(0)",
+        8,
+        79,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Sources unreadable",
+        "count(voltage_sdm_check_up == 0) or vector(0)",
+        12,
+        79,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    table("Masking checks", "voltage_sdm_mask_ok", 0, 83, w=12, h=6, rename={"Value": "ok"}),
+    table(
+        "Jobs: hours since last success",
+        "sort_desc(voltage:sdm_job_hours_since_success)",
+        12,
+        83,
+        w=12,
+        h=6,
+        rename={"Value": "hours"},
+    ),
 ]
 
 dashboard = {

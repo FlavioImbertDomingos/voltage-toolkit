@@ -78,6 +78,22 @@ See [COVERAGE.md](COVERAGE.md). Evaluated once per cycle when `coverage:` is con
 | `voltage_coverage_feed_rows`, `voltage_coverage_map_entries`, `voltage_coverage_unclassified_mappings`, `voltage_coverage_errors` | gauge | — | Sizes and input problems |
 | `voltage_coverage_feed_mtime_seconds` | gauge | — | Modification time of the classification feed (→ `voltage:coverage_feed_age_days`) |
 
+## Structured Data Manager — masked data and jobs
+
+See [SDM.md](SDM.md). No `target` label; `check` is the configured check name.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_sdm_check_up` | gauge | `check`, `kind` | 1 if the source was read and the check evaluated |
+| `voltage_sdm_mask_ok` | gauge | `check`, `kind` (leak / consistency / constant) | 1 if the masking check passed |
+| `voltage_sdm_mask_rows` | gauge | `check`, `kind` | Rows examined |
+| `voltage_sdm_mask_hits` | gauge | `check`, `kind` | leak: canary / looks-live matches; consistency: inconsistently masked keys; constant: 1 if all identical |
+| `voltage_sdm_job_last_success_timestamp_seconds` | gauge | `check`, `job` | Last successful finish (→ `voltage:sdm_job_hours_since_success`) |
+| `voltage_sdm_job_last_finished_timestamp_seconds` | gauge | `check`, `job` | Most recent finish, any status |
+| `voltage_sdm_job_last_status` | gauge | `check`, `job`, `status` | Most recent status, always 1 |
+| `voltage_sdm_job_last_rows` | gauge | `check`, `job` | Rows processed by the most recent run |
+| `voltage_sdm_job_stale` / `voltage_sdm_job_failing` | gauge | `check`, `job` | 1 if no success within `expect_every` / latest run failed |
+
 ## Fleet agreement — several vantage points, one district
 
 Targets that share a `fleet:` name are expected to be the same district seen from different
@@ -121,6 +137,7 @@ and `extra_tls_hosts` from config.
 |---|---|
 | `voltage:tokenize_error_ratio_10m` | failures / all probes over 10 min, per target and format |
 | `voltage:protect_p95_seconds_10m` / `voltage:access_p95_seconds_10m` | p95 latency over 10 min |
+| `voltage:sdm_job_hours_since_success` | Hours since an SDM job last succeeded |
 | `voltage:coverage_feed_age_days` | Age of the classification feed |
 | `voltage:support_days_remaining` | Days until the running appliance version leaves vendor maintenance (negative = out of support) |
 | `voltage:certificate_days_until_expiry` | days left per certificate |

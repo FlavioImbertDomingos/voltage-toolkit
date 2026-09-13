@@ -6,6 +6,23 @@
       support_end:                  # optional: extend the built-in appliance support-lifecycle table
         "7.0.4": 2027-11-30         #   version prefix -> end-of-maintenance date (from your support portal)
 
+    sdm:                            # optional: Structured Data Manager -- masked data and batch jobs (docs/SDM.md)
+      masking:
+        - name: nonprod-cards-pan
+          kind: leak                                    # leak | consistency | constant
+          source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+          query: "SELECT pan FROM customers"
+          canary_file: /config/canaries.txt             # values planted in prod that must never appear masked
+        - name: nonprod-cards-ri
+          kind: consistency
+          source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+          query: "SELECT c.customer_id, c.pan, o.pan FROM customers c JOIN orders o USING (customer_id)"
+      jobs:
+        - name: sdm-jobs
+          source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+          query: "SELECT job_name, status, finished_at, rows_processed FROM sdm_job_history"
+          expect_every: 24h
+
     coverage:                       # optional: is every classified sensitive column actually protected?
       classification_csv: /config/classification.csv     # system,schema,table,column,classification,confidence
       data_map: /config/voltage-data-map.yml             # column -> district/format/identities (config-as-code)
@@ -111,6 +128,7 @@ class Config:
     log_level: str = "INFO"
     support_end: dict = field(default_factory=dict)  # version prefix -> ISO date | {release, end}
     coverage: CoverageConfig | None = None
+    sdm: dict | None = None  # raw `sdm:` block; parsed by sdm.parse_config (masking checks, jobs)
 
 
 def _secret(entry: dict, name: str, key: str = "secret") -> str:
@@ -228,4 +246,5 @@ def load(path: str | Path) -> Config:
         log_level=str(os.environ.get("VOLTAGE_EXPORTER_LOG_LEVEL", ex.get("log_level", "INFO"))),
         support_end={str(k): v for k, v in (ex.get("support_end") or {}).items()},
         coverage=cov,
+        sdm=raw.get("sdm") or None,
     )

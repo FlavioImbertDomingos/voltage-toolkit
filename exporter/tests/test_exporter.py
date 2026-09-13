@@ -661,3 +661,175 @@ def test_coverage_config_loads(tmp_path):
     )
     with pytest.raises(config.ConfigError):
         config.load(cfg)
+
+
+# --------------------------------------------------------------------- SDM: masking quality + jobs (R8, R9)
+@pytest.fixture(scope="module")
+def nonprod_db(tmp_path_factory):
+    """The demo seeder, exactly as compose runs it."""
+    import importlib.util as ilu
+    from pathlib import Path
+
+    seed = Path(__file__).resolve().parents[2] / "demo" / "seed_nonprod.py"
+    spec = ilu.spec_from_file_location("seed_nonprod", seed)
+    mod = ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    path = tmp_path_factory.mktemp("sdm") / "nonprod.db"
+    mod.main(str(path))
+    return str(path), mod.CANARIES
+
+
+def _sdm_cfg(db, canaries):
+    return {
+        "masking": [
+            {"name": "pan-leak", "kind": "leak", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+             "query": "SELECT pan FROM customers", "canaries": canaries},
+            {"name": "pan-ri", "kind": "consistency", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+             "query": "SELECT c.customer_id, c.pan, o.pan FROM customers c JOIN orders o USING (customer_id)"},
+            {"name": "ssn-constant", "kind": "constant", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+             "query": "SELECT ssn FROM customers"},
+            {"name": "pan-heuristic", "kind": "leak", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+             "query": "SELECT pan FROM customers", "classification": "PAN", "heuristic": True},
+        ],
+        "jobs": [
+            {"name": "sdm", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+             "query": "SELECT job_name, status, finished_at, rows_processed FROM sdm_job_history",
+             "expect_every": "24h"},
+        ],
+    }  # fmt: skip
+
+
+def test_sdm_masking_checks_on_demo_db(nonprod_db):
+    from voltage_exporter import sdm
+
+    db, canaries = nonprod_db
+    cfg = sdm.parse_config(_sdm_cfg(db, canaries))
+    res = {m.name: sdm.run_mask_check(m) for m in cfg.masking}
+    leak = res["pan-leak"]
+    assert leak.ok is False and leak.hits == 1 and leak.rows == 40  # the planted canary row
+    assert canaries[0] not in leak.detail  # never printed
+    assert res["pan-ri"].ok is True and res["pan-ri"].hits == 0
+    const = res["ssn-constant"]
+    assert const.ok is False and "identical" in const.detail
+    # the heuristic is *narrow*: masked PANs are not Luhn-valid here, the canary is -> exactly 1 hit
+    assert res["pan-heuristic"].ok is False and res["pan-heuristic"].hits == 1
+
+
+def test_sdm_leak_needs_a_method_and_reads_canary_files(nonprod_db, tmp_path):
+    from voltage_exporter import sdm
+
+    db, canaries = nonprod_db
+    src = {"type": "sql", "dsn": f"sqlite:///{db}"}
+    none = sdm.parse_config(
+        {"masking": [{"name": "x", "kind": "leak", "source": src, "query": "SELECT pan FROM customers"}]}
+    )
+    r = sdm.run_mask_check(none.masking[0])
+    assert r.ok is None and "needs canaries" in r.detail
+    # canary file, hashed
+    import hashlib
+
+    f = tmp_path / "canaries.sha256"
+    f.write_text("\n".join(hashlib.sha256(c.encode()).hexdigest() for c in canaries) + "\n")
+    hashed = sdm.parse_config(
+        {"masking": [{"name": "x", "kind": "leak", "source": src, "query": "SELECT pan FROM customers",
+                      "canary_file": str(f), "canaries_hashed": True}]}
+    )  # fmt: skip
+    r = sdm.run_mask_check(hashed.masking[0])
+    assert r.ok is False and r.hits == 1
+
+
+def test_sdm_consistency_detects_inconsistent_keys(tmp_path):
+    import sqlite3
+
+    from voltage_exporter import sdm
+
+    db = tmp_path / "t.db"
+    c = sqlite3.connect(db)
+    c.executescript("CREATE TABLE a(k, v); CREATE TABLE b(k, v);")
+    c.executemany("INSERT INTO a VALUES (?,?)", [(1, "m1"), (2, "m2"), (3, "m3")])
+    c.executemany("INSERT INTO b VALUES (?,?)", [(1, "m1"), (2, "DIFFERENT"), (3, "m3")])
+    c.commit()
+    c.close()
+    cfg = sdm.parse_config(
+        {"masking": [{"name": "ri", "kind": "consistency", "source": {"type": "sql", "dsn": f"sqlite:///{db}"},
+                      "query": "SELECT a.k, a.v, b.v FROM a JOIN b ON a.k = b.k"}]}
+    )  # fmt: skip
+    r = sdm.run_mask_check(cfg.masking[0])
+    assert r.ok is False and r.hits == 1
+
+
+def test_sdm_file_source_and_bad_inputs(tmp_path):
+    from voltage_exporter import sdm
+
+    f = tmp_path / "masked.csv"
+    f.write_text("id,pan\n1,4539000000000001\n2,4539000000000002\n")
+    cfg = sdm.parse_config(
+        {"masking": [{"name": "f", "kind": "leak", "source": {"type": "file", "path": str(f)}, "columns": ["pan"],
+                      "canaries": ["4539000000000002"]}]}
+    )  # fmt: skip
+    r = sdm.run_mask_check(cfg.masking[0])
+    assert r.ok is False and r.hits == 1 and r.rows == 2
+    missing = sdm.parse_config(
+        {"masking": [{"name": "f", "kind": "leak", "source": {"type": "file", "path": str(tmp_path / "nope.csv")},
+                      "columns": ["pan"], "canaries": ["x"]}]}
+    )  # fmt: skip
+    assert sdm.run_mask_check(missing.masking[0]).ok is None
+    with pytest.raises(Exception, match="unknown kind"):
+        sdm.parse_config({"masking": [{"name": "x", "kind": "magic", "source": {"type": "file", "path": "p"}}]})
+    with pytest.raises(Exception, match="SELECT"):
+        from voltage_exporter.sources import Source, query_rows
+
+        query_rows(Source.from_config({"type": "sql", "dsn": "sqlite://:memory:"}), "DROP TABLE x")
+
+
+def test_sdm_jobs_stale_and_failing(nonprod_db):
+    from voltage_exporter import sdm
+
+    db, canaries = nonprod_db
+    cfg = sdm.parse_config(_sdm_cfg(db, canaries))
+    r = sdm.run_job_check(cfg.jobs[0])
+    assert r.ok is False
+    assert [j.job for j in r.jobs] == ["archive-orders-2019", "mask-nonprod-refresh"]
+    assert r.stale == ["mask-nonprod-refresh"] and r.failing == ["mask-nonprod-refresh"]
+    assert (
+        "archive-orders-2019" in r.last_success and "mask-nonprod-refresh" in r.last_success
+    )  # 3 days ago, still known
+    latest = {j.job: j for j in r.jobs}
+    assert latest["archive-orders-2019"].status == "success" and latest["archive-orders-2019"].rows == 1_198_002
+    assert latest["mask-nonprod-refresh"].status == "failed"
+    # a generous window makes the stale one fine (the failure remains)
+    cfg.jobs[0].expect_every_seconds = 10 * 86400
+    r2 = sdm.run_job_check(cfg.jobs[0])
+    assert r2.stale == [] and r2.failing == ["mask-nonprod-refresh"]
+    assert sdm._duration("90m", 0) == 5400 and sdm._duration("7d", 0) == 7 * 86400 and sdm._duration(30, 0) == 30
+
+
+def test_sdm_metrics(nonprod_db):
+    from prometheus_client import REGISTRY
+
+    from voltage_exporter import sdm
+
+    db, canaries = nonprod_db
+    cfg = sdm.parse_config(_sdm_cfg(db, canaries))
+    metrics.apply_sdm([sdm.run_mask_check(m) for m in cfg.masking], [sdm.run_job_check(j) for j in cfg.jobs])
+    g = REGISTRY.get_sample_value
+    assert g("voltage_sdm_mask_ok", {"check": "pan-leak", "kind": "leak"}) == 0.0
+    assert g("voltage_sdm_mask_hits", {"check": "pan-leak", "kind": "leak"}) == 1.0
+    assert g("voltage_sdm_mask_ok", {"check": "pan-ri", "kind": "consistency"}) == 1.0
+    assert g("voltage_sdm_check_up", {"check": "pan-leak", "kind": "leak"}) == 1.0
+    assert g("voltage_sdm_job_stale", {"check": "sdm", "job": "mask-nonprod-refresh"}) == 1.0
+    assert g("voltage_sdm_job_failing", {"check": "sdm", "job": "mask-nonprod-refresh"}) == 1.0
+    assert g("voltage_sdm_job_stale", {"check": "sdm", "job": "archive-orders-2019"}) == 0.0
+    assert g("voltage_sdm_job_last_rows", {"check": "sdm", "job": "archive-orders-2019"}) == 1_198_002.0
+    assert g("voltage_sdm_job_last_status", {"check": "sdm", "job": "mask-nonprod-refresh", "status": "failed"}) == 1.0
+    assert g("voltage_sdm_job_last_success_timestamp_seconds", {"check": "sdm", "job": "archive-orders-2019"}) > 0
+
+
+def test_sdm_config_loads(tmp_path):
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(
+        "sdm:\n  masking:\n"
+        "    - {name: x, kind: leak, source: {type: file, path: /m.csv}, columns: [pan], canaries: [a]}\n"
+        "targets:\n  - {name: a, policy_url: https://x/policy/clientPolicy.xml, identity: i, auth: {secret: s}}\n"
+    )
+    assert config.load(cfg).sdm["masking"][0]["name"] == "x"

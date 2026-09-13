@@ -20,6 +20,8 @@ config.yml ─► voltage_exporter.config.load()
            fleet.evaluate(all results) ──► metrics.apply_fleet()   (targets sharing `fleet:` must agree)
            coverage_runner.run_coverage() ──► coverage.evaluate() ──► metrics.apply_coverage()
                  (classification CSV × voltage-data-map.yml × the districts' live formats)
+           sdm.run_mask_check() / run_job_check() ──► metrics.apply_sdm()
+                 (sources.py: one SELECT over any DB-API driver, or a CSV — read-only)
                  ├─ policy.format_domain_size() / is_efpe()   per format  (R2, R5)
                  ├─ key tables → current number, rotation counter, key size  (R1)
                  └─ lifecycle.support_end(server_version)       (R12; built-in table + config overrides)
@@ -64,6 +66,14 @@ certificates and endpoints*. Coverage is about *data columns* and which format p
 a different subject with different inputs (a discovery feed, a data map). Keeping it here also
 means the audit role and the exporter share one stdlib module, exactly like the policy parser.
 keycensus can consume the output later. See [COVERAGE.md](COVERAGE.md).
+
+**Why the SDM checks read data, not SDM:** SDM has no public API, and masking quality is a
+property of the *result*, not of the job that claims to have produced it. So `sdm.py` reads
+masked rows and job history through one adapter (`sources.py`: SQL via any DB-API driver, or a
+CSV export) and asks three questions of the data — did a planted canary survive, does the same
+key mask the same way in every table, is the column a constant — plus when each job last
+succeeded. The leak heuristic is off by default because FPE with checksum preservation is
+Luhn-valid by design; canaries are the honest test. See [SDM.md](SDM.md).
 
 **Why hash the policy:** clientPolicy.xml is the only unauthenticated view of the district's
 configuration. A hash change is either a change window or an incident.

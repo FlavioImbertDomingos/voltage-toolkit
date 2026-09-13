@@ -282,3 +282,57 @@ tests:
             exp_annotations:
               summary: "Format ORA-DATE in district prod is offered but nothing uses it"
               description: "No data-map column and no declared identity references it. Its keys still rotate and it is still an authorisable capability. Retire it, or map what uses it."
+
+  # --- SDM (R8, R9)
+  - interval: 15s
+    input_series:
+      - series: 'voltage_sdm_mask_ok{check="pan-leak", kind="leak"}'
+        values: "1 0 0 0"
+      - series: 'voltage_sdm_mask_hits{check="pan-leak", kind="leak"}'
+        values: "0 1 1 1"
+      - series: 'voltage_sdm_mask_ok{check="pan-ri", kind="consistency"}'
+        values: "0x200"
+      - series: 'voltage_sdm_job_stale{check="sdm", job="mask-nonprod-refresh"}'
+        values: "1x300"
+      - series: 'voltage_sdm_job_last_success_timestamp_seconds{check="sdm", job="mask-nonprod-refresh"}'
+        values: "-259200x300"
+      - series: 'voltage_sdm_job_failing{check="sdm", job="mask-nonprod-refresh"}'
+        values: "1x10"
+      - series: 'voltage_sdm_check_up{check="pan-leak", kind="leak"}'
+        values: "0x80"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: SDMMaskLeak
+        exp_alerts:
+          - exp_labels: {severity: critical, check: pan-leak, kind: leak}
+            exp_annotations:
+              summary: "MASKING LEAK: 1 live-looking value(s) in masked data (pan-leak)"
+              description: "A planted canary (or, if the heuristic is on, a live-looking value) is present in the masked copy. The masking job skipped rows, ran against the wrong source, or a refresh copied production over it. Non-production now holds production data: treat as an incident, and do not hand this environment to developers until it is re-masked."
+      - eval_time: 31m
+        alertname: SDMMaskInconsistent
+        exp_alerts:
+          - exp_labels: {severity: warning, check: pan-ri, kind: consistency}
+            exp_annotations:
+              summary: "pan-ri: the same source key masks to different values across tables"
+              description: "Referential integrity broke in the masked environment: joins on this column silently drop rows and test results lie. Usually two tables masked by different jobs, formats or key epochs. Re-mask them together."
+      - eval_time: 61m
+        alertname: SDMJobStale
+        exp_alerts:
+          - exp_labels: {severity: warning, check: sdm, job: mask-nonprod-refresh}
+            exp_annotations:
+              summary: "SDM job mask-nonprod-refresh has not succeeded within its expected interval"
+              description: "Last success 73 hours ago. Archive, retention and masking runs fail quietly; the first symptom is otherwise a storage bill or a retention violation."
+      - eval_time: 1m
+        alertname: SDMJobFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, check: sdm, job: mask-nonprod-refresh}
+            exp_annotations:
+              summary: "SDM job mask-nonprod-refresh: most recent run failed"
+              description: "Check the job's own log. If it is the masking refresh, the masked environment may be partial -- see SDMMaskLeak / SDMMaskInconsistent."
+      - eval_time: 16m
+        alertname: SDMSourceUnreadable
+        exp_alerts:
+          - exp_labels: {severity: warning, check: pan-leak, kind: leak}
+            exp_annotations:
+              summary: "SDM check pan-leak (leak) cannot read its source"
+              description: "Database unreachable, credentials rejected, query invalid, or export file missing. The check's other metrics are stale until fixed; see exporter logs."

@@ -22,6 +22,8 @@ groups:
         expr: (voltage_support_end_timestamp_seconds - time()) / 86400
       - record: voltage:coverage_feed_age_days
         expr: (time() - voltage_coverage_feed_mtime_seconds) / 86400
+      - record: voltage:sdm_job_hours_since_success
+        expr: (time() - voltage_sdm_job_last_success_timestamp_seconds) / 3600
 
   - name: voltage-availability
     rules:
@@ -277,3 +279,52 @@ groups:
         annotations:
           summary: "Coverage inputs (classification feed / data map) cannot be read"
           description: "voltage_coverage_up is 0: a file is missing, unreadable or not valid YAML/CSV. Coverage metrics are stale until fixed; check exporter logs."
+
+  # Structured Data Manager: masked data and batch jobs (R8, R9). docs/SDM.md
+  - name: voltage-sdm
+    rules:
+      - alert: SDMMaskLeak
+        expr: voltage_sdm_mask_ok{kind="leak"} == 0
+        labels: {severity: critical}
+        annotations:
+          summary: "MASKING LEAK: {{ with printf `voltage_sdm_mask_hits{check=\"%s\",kind=\"leak\"}` $labels.check | query }}{{ . | first | value }}{{ end }} live-looking value(s) in masked data ({{ $labels.check }})"
+          description: "A planted canary (or, if the heuristic is on, a live-looking value) is present in the masked copy. The masking job skipped rows, ran against the wrong source, or a refresh copied production over it. Non-production now holds production data: treat as an incident, and do not hand this environment to developers until it is re-masked."
+
+      - alert: SDMMaskInconsistent
+        expr: voltage_sdm_mask_ok{kind="consistency"} == 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.check }}: the same source key masks to different values across tables"
+          description: "Referential integrity broke in the masked environment: joins on this column silently drop rows and test results lie. Usually two tables masked by different jobs, formats or key epochs. Re-mask them together."
+
+      - alert: SDMMaskConstant
+        expr: voltage_sdm_mask_ok{kind="constant"} == 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.check }}: every masked value is identical"
+          description: "A fill-with-X job that 'worked'. The column is useless for testing and any code path that branches on it is untested."
+
+      - alert: SDMJobStale
+        expr: voltage_sdm_job_stale == 1
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "SDM job {{ $labels.job }} has not succeeded within its expected interval"
+          description: "Last success {{ with printf `voltage:sdm_job_hours_since_success{check=\"%s\",job=\"%s\"}` $labels.check $labels.job | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }} hours ago. Archive, retention and masking runs fail quietly; the first symptom is otherwise a storage bill or a retention violation."
+
+      - alert: SDMJobFailing
+        expr: voltage_sdm_job_failing == 1
+        labels: {severity: warning}
+        annotations:
+          summary: "SDM job {{ $labels.job }}: most recent run failed"
+          description: "Check the job's own log. If it is the masking refresh, the masked environment may be partial -- see SDMMaskLeak / SDMMaskInconsistent."
+
+      - alert: SDMSourceUnreadable
+        expr: voltage_sdm_check_up == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "SDM check {{ $labels.check }} ({{ $labels.kind }}) cannot read its source"
+          description: "Database unreachable, credentials rejected, query invalid, or export file missing. The check's other metrics are stale until fixed; see exporter logs."
