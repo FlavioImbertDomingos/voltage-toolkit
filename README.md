@@ -15,7 +15,7 @@ Two things in one repo:
 
 Plus a mock appliance, so all of it runs with `docker compose up` and no Voltage licence.
 
-<img width="968" height="544" alt="image" src="https://github.com/user-attachments/assets/80abded6-3c78-43f4-87e4-25e58b73fad5" />
+![voltage-toolkit overview: runtime monitoring, configuration + drift control, data coverage — and where the answers go (PagerDuty, Splunk, Grafana)](docs/overview.png)
 
 
 [![CI](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml)
