@@ -20,10 +20,13 @@ def nid():
     return _id
 
 
-def target(expr, legend="__auto", instant=False):
+def target(expr, legend="__auto", instant=False, fmt=None):
     t = {"datasource": DS, "expr": expr, "legendFormat": legend, "refId": f"R{nid()}"}
     if instant:
         t["instant"] = True
+        t["range"] = False
+    if fmt:
+        t["format"] = fmt
     return t
 
 
@@ -68,11 +71,14 @@ def timeseries(title, targets, x, y, w=12, h=8, unit=None, stack=False, thr=None
 def table(title, expr, x, y, w=24, h=7, rename=None):
     return {
         "id": nid(), "type": "table", "title": title, "gridPos": {"x": x, "y": y, "w": w, "h": h},
-        "datasource": DS, "targets": [target(expr, instant=True)],
+        # format=table: one row per series with labels as columns. Without it Grafana
+        # returns one time-series frame per series and the table shows a frame picker.
+        "datasource": DS, "targets": [target(expr, instant=True, fmt="table")],
         "transformations": [{"id": "organize", "options": {
             "excludeByName": {"Time": True, "__name__": True, "job": True, "instance": True},
             "renameByName": rename or {}}}],
-        "fieldConfig": {"defaults": {}, "overrides": []},
+        "options": {"showHeader": True, "cellHeight": "sm"},
+        "fieldConfig": {"defaults": {"custom": {"filterable": True}}, "overrides": []},
     }  # fmt: skip
 
 

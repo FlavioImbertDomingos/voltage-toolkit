@@ -88,6 +88,7 @@ probe_success = Gauge(f"{NS}_tokenize_success", "1 if the last protect+access ro
                       ["target", "format", "identity"])  # fmt: skip
 probe_total = Counter(f"{NS}_tokenize_probes", "Round-trip probes run", ["target", "format", "result"])
 probe_errors = Counter(f"{NS}_tokenize_errors", "Failed probes by kind", ["target", "format", "kind"])
+ERROR_KINDS = ("auth", "http", "timeout", "connection", "mismatch", "other")
 protect_hist = Histogram(f"{NS}_protect_seconds", "protect (tokenize) latency", ["target", "format"], buckets=BUCKETS)
 access_hist = Histogram(f"{NS}_access_seconds", "access (detokenize) latency", ["target", "format"], buckets=BUCKETS)
 protect_last = Gauge(f"{NS}_protect_last_seconds", "Last protect latency", ["target", "format"])
@@ -252,6 +253,12 @@ def apply(result: TargetResult) -> None:
         f = r.spec.format
         ident = r.spec.identity or result.target.identity
         probe_success.labels(t, f, ident).set(1.0 if r.ok else 0.0)
+        # Both result series and every error kind exist from the first cycle, at 0, so
+        # rate()-based ratios evaluate to 0 instead of "no data" on a healthy stack.
+        for result_label in ("success", "failure"):
+            probe_total.labels(t, f, result_label)
+        for kind in ERROR_KINDS:
+            probe_errors.labels(t, f, kind)
         probe_total.labels(t, f, "success" if r.ok else "failure").inc()
         if not r.ok:
             probe_errors.labels(t, f, r.error_kind or "other").inc()
