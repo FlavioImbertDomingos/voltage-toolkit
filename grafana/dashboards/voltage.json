@@ -144,7 +144,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "UP if the exporter could download clientPolicy.xml from every selected target in the last cycle.\n\nWhy it matters: Every SecureData client downloads this file at startup. While it is unreachable, running applications keep working on their cached copy, but no new pod, batch job or server can start tokenizing. This is the difference between 'degraded' and 'nothing new can start'.\n\nSource: `voltage_policy_up` \u2014 HTTP GET of the policy URL by the exporter, every probe cycle."
     },
     {
       "id": 4,
@@ -210,7 +211,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "UP if every key server URL listed inside the policy answered an HTTP request.\n\nWhy it matters: Clients with cached keys keep working; anything that needs a *new* key \u2014 a new identity, a key rotation, a cold start \u2014 fails. A key server outage is silent until something restarts.\n\nSource: `voltage_keyserver_up{url}` \u2014 the exporter GETs each `<KeyServer url>` it finds in the policy."
     },
     {
       "id": 6,
@@ -270,7 +272,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Percentage of configured synthetic probes whose protect \u2192 access round-trip succeeded.\n\nWhy it matters: The only question that matters at 3 a.m. The exporter does what an application does: protects a synthetic value, then accesses (detokenizes) the result. Below 100 % means at least one format on at least one target cannot tokenize.\n\nSource: `voltage_tokenize_success{target,format}` \u2014 one series per probe; success = both calls returned and the shape was preserved."
     },
     {
       "id": 8,
@@ -336,7 +339,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if access(protect(x)) returned exactly x for every probe.\n\nWhy it matters: A wrong detokenize is worse than an error: it returns HTTP 200 with the wrong data, and the application writes it to a database. This tile is the one that pages a human at any hour.\n\nSource: `voltage_tokenize_roundtrip_ok` \u2014 byte-for-byte comparison of the original sample and the detokenized result."
     },
     {
       "id": 10,
@@ -397,7 +401,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "95th-percentile latency of the protect call over the last 10 minutes, worst target.\n\nWhy it matters: Checkout and batch pipelines have latency budgets; tokenization sits inside them. A rising p95 with a flat p50 is the classic sign of a key server or network path in trouble.\n\nSource: `voltage:protect_p95_seconds_10m` \u2014 recording rule over the `voltage_protect_seconds` histogram."
     },
     {
       "id": 12,
@@ -458,7 +463,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Share of probes that failed in the last 10 minutes, worst target/format.\n\nWhy it matters: Intermittent failures that applications retry around never show up as an outage; they show up here. Above 5 % fires VoltageErrorRateHigh.\n\nSource: `voltage:tokenize_error_ratio_10m` \u2014 failed / total from `voltage_tokenize_probes_total`. The exporter pre-creates the failure series at 0 so this reads 0 %, not 'No data', on a healthy stack."
     },
     {
       "id": 14,
@@ -523,7 +529,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Days until the soonest-expiring TLS certificate among the policy host, Web Services host, key servers and any extra hosts.\n\nWhy it matters: The number-one cause of 'everything stopped at once': every SecureData client validates the appliance certificate, so one expiry takes down every application simultaneously. Orange at 30 days, red at 7.\n\nSource: `voltage:certificate_days_until_expiry` \u2014 from `notAfter` of the certificate presented during the exporter's TLS handshake to each host."
     },
     {
       "id": 16,
@@ -574,7 +581,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Count of formats (FPE, tokenization, eFPE) the selected targets' policies offer.\n\nWhy it matters: A sudden change is a configuration change somebody made in the Management Console. Compare with 'Policy changes (24h)'.\n\nSource: `voltage_policy_formats{kind}` \u2014 parsed from `<FormatMappings>` and `<TokenizationFormats>` in clientPolicy.xml. Summed across selected targets."
     },
     {
       "id": 18,
@@ -640,7 +648,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "UP if the Management Console answered an HTTP request. Shown in orange (not red) when down.\n\nWhy it matters: Control plane only. Only one console instance is active per deployment; its outage blocks policy changes, new identities and audit review \u2014 but not tokenization. An alert that cries 'Voltage is down' for a control-plane outage trains people to ignore the one that matters, so this is deliberately a warning.\n\nSource: `voltage_console_up` \u2014 GET of `console_url` from the target config (any answer below HTTP 500 counts as up; a login page is a healthy console)."
     },
     {
       "id": 20,
@@ -695,7 +704,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "How many times the policy file's hash changed in the last 24 hours.\n\nWhy it matters: PCI DSS change control: every policy change should match a ticket. A change outside a window is either drift or an unauthorised admin action.\n\nSource: `voltage_policy_changes_total` \u2014 incremented when the SHA-256 of clientPolicy.xml differs from the previous cycle."
     },
     {
       "id": 22,
@@ -748,7 +758,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Wall-clock time the last full probe cycle took for the slowest target.\n\nWhy it matters: If this approaches the probe interval, probes overlap and the exporter falls behind; it also reflects appliance responsiveness end to end.\n\nSource: `voltage_probe_cycle_seconds` \u2014 measured by the exporter around the whole cycle."
     },
     {
       "id": 24,
@@ -809,7 +820,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Seconds since the last completed probe cycle.\n\nWhy it matters: If this grows past a few intervals the dashboard is stale, and every other tile is showing old news. VoltageProbesStale fires at 5 minutes.\n\nSource: `time() - voltage_probe_last_run_timestamp_seconds`."
     },
     {
       "id": 26,
@@ -875,7 +887,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if the three integrity probes passed: determinism, double-protect, format isolation.\n\nWhy it matters: Three failures that return HTTP 200 and corrupt data anyway: protect(x) \u2260 protect(x) (joins silently break), protect(protect(x)) corrupting the value, and a token detokenizing under the wrong format (formats sharing a key). None of them shows as an error; all of them show here.\n\nSource: `voltage_integrity_ok{check}` \u2014 extra protect/access calls the exporter makes each cycle."
     },
     {
       "id": 28,
@@ -972,7 +985,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "Latency distribution of the protect call, across all selected targets, 5-minute windows.\n\nWhy it matters: The gap between p50 and p99 is the story: a flat p50 with a jumping p99 is a key server or connection-pool problem, not general load. The red line is the 500 ms alert threshold.\n\nSource: `histogram_quantile` over `voltage_protect_seconds_bucket` \u2014 the exporter observes every protect call into a histogram."
     },
     {
       "id": 34,
@@ -1022,7 +1036,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "95th-percentile latency of the access (detokenize) call, one line per target and format.\n\nWhy it matters: Access is the call on the read path \u2014 customer lookups, statements, reports. A single format being slow points at that format's key table or a tokenization (SST) table lookup.\n\nSource: `voltage:access_p95_seconds_10m` \u2014 recording rule over `voltage_access_seconds`."
     },
     {
       "id": 36,
@@ -1090,7 +1105,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "Failed probes as a share of all probes, per target and format, rolling 10 minutes.\n\nWhy it matters: One format failing while the others succeed is a policy or identity permission problem, not an outage. Everything failing at once is the appliance, the network or a rotated secret.\n\nSource: `voltage:tokenize_error_ratio_10m` \u2014 from `voltage_tokenize_probes_total{result}`."
     },
     {
       "id": 38,
@@ -1139,7 +1155,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "Count of failed probes in the last 10 minutes, stacked by cause.\n\nWhy it matters: 'Why' before 'what': auth = somebody rotated the shared secret; http = the appliance returned an error; timeout / connection = network or load; mismatch = data integrity. The kind tells you which team to call.\n\nSource: `voltage_tokenize_errors_total{kind}` \u2014 the exporter classifies every failure; every kind is pre-created at 0 so the panel shows flat lines, not 'No data', when healthy."
     },
     {
       "id": 39,
@@ -1207,7 +1224,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Every format the policy currently offers, with its kind (fpe, tokenization, efpe) per target.\n\nWhy it matters: The list an application developer needs and an auditor asks for. Compare targets: a format present on one and missing on another is propagation lag or drift.\n\nSource: `voltage_policy_format{format,kind}` \u2014 parsed from clientPolicy.xml each cycle."
     },
     {
       "id": 42,
@@ -1264,7 +1282,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Each TLS certificate the exporter saw, its subject, and days until it expires.\n\nWhy it matters: The tile above shows the nearest; this table shows all of them so the renewal ticket names the right host. Key-server certificates are the ones people forget.\n\nSource: `voltage:certificate_days_until_expiry{host,subject}` \u2014 from the TLS handshake to each host."
     },
     {
       "id": 44,
@@ -1319,7 +1338,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "District, policy id, policy hash, appliance version and target, one row per target.\n\nWhy it matters: Two targets in the same district with different hashes may be fine (hostnames differ) or may be drift \u2014 the fleet row decides. The hash is the value to quote in a change ticket.\n\nSource: `voltage_policy_info` \u2014 attributes of `<clientPolicy>` and `<server>` in the policy file."
     },
     {
       "id": 46,
@@ -1387,7 +1407,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Number of FPE formats whose input domain is smaller than one million values.\n\nWhy it matters: NIST SP 800-38G Rev. 1 requires a domain of at least 10^6 for FF1. The appliance will happily encrypt a 5-digit domain (an SSN keeping its last four digits, a CVV): the ciphertext is then brute-forceable. Use SST, FPH or AES with a schema change instead.\n\nSource: `voltage_format_below_minimum_domain` \u2014 radix^(length \u2212 preserved characters), computed from the format attributes in the policy."
     },
     {
       "id": 49,
@@ -1438,7 +1459,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Number of formats that use embedded FPE (eFPE).\n\nWhy it matters: eFPE embeds the key epoch in the ciphertext, so the same value protects differently after a rotation. Columns protected with it cannot be joined or deduplicated across epochs and are excluded from the determinism check for that reason.\n\nSource: `voltage_policy_format_efpe` \u2014 `encryption=\"eFPE\"` on the format in the policy."
     },
     {
       "id": 51,
@@ -1489,7 +1511,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "How many key tables changed their current key number in the last 24 hours.\n\nWhy it matters: Rotation in Voltage is `currentNumber` ticking up in the policy \u2014 there is no other visible event. Expected in a crypto-period change window; otherwise investigate. eFPE columns now hold two ciphertext epochs.\n\nSource: `voltage_key_rotations_total{table}` \u2014 incremented when `<keyNumberTable currentNumber>` changes."
     },
     {
       "id": 53,
@@ -1544,7 +1567,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Smallest key size among the *current* keys of all key tables.\n\nWhy it matters: The vendor's post-quantum argument depends on AES-256 (128-bit security under Grover). A key table whose current key is 128 bits does not get that argument. Red below 256.\n\nSource: `voltage_key_current_size_bits{table}` \u2014 the `size` attribute of the current key number in the policy."
     },
     {
       "id": 55,
@@ -1604,7 +1628,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Days until the running appliance version leaves OpenText maintenance.\n\nWhy it matters: After that date: no security fixes, and a PCI DSS 6.3.3 finding. The version comes from the policy file, the dates from the release notes (built-in table plus `support_end` config).\n\nSource: `voltage:support_days_remaining` \u2014 from `voltage_support_end_timestamp_seconds` and `<server version>` in the policy."
     },
     {
       "id": 57,
@@ -1661,7 +1686,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Each key table (PCI, PII, \u2026) with its current key number, per target.\n\nWhy it matters: The current number is the rotation state. Two targets in one district showing different numbers means a rotation reached one region and not the other \u2014 DR would then produce different tokens.\n\nSource: `voltage_key_table_current_number{table}` \u2014 `<keyNumberConfig>` in clientPolicy.xml."
     },
     {
       "id": 59,
@@ -1718,7 +1744,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "The computed input domain (number of possible values) for each FPE format, smallest first.\n\nWhy it matters: Domain size is the brute-force budget of the ciphertext. Anything under 10^6 is flagged in the tile above; this table lets you see how far under, and which format to redesign.\n\nSource: `voltage_format_domain_size{format}` \u2014 radix^(length \u2212 preserved) from the format definition."
     },
     {
       "id": 61,
@@ -1773,7 +1800,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Running appliance version, major/minor split, and release name per target.\n\nWhy it matters: The version is what the lifecycle clock and the support-end alert key on; it also confirms that all regions run the same build (the fleet row checks this too).\n\nSource: `voltage_appliance_version_info` \u2014 `<server version>` in the policy file."
     },
     {
       "id": 63,
@@ -1852,7 +1880,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if every member of every fleet protects the same synthetic value to the same token.\n\nWhy it matters: The DR readiness test. Same policy, same formats, different master secret or token table \u2192 different tokens, and nothing errors. Failover would then write tokens production cannot detokenize. This pages a human.\n\nSource: `voltage_fleet_agreement{check=\"token\"}` \u2014 SHA-256 of each member's token, compared. The token itself is never stored."
     },
     {
       "id": 66,
@@ -1918,7 +1947,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if every fleet member serves the same policy *configuration* (formats, auth, key tables, version).\n\nWhy it matters: Policy propagation is lazy and per node: after a Management Console change, nodes update when they next serve a request. Until then, different nodes enforce different policy.\n\nSource: `voltage_fleet_agreement{check=\"policy\"}` \u2014 a fingerprint that ignores hostnames and key-server URLs, which legitimately differ per region."
     },
     {
       "id": 68,
@@ -1984,7 +2014,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if each key table has the same current key number on every fleet member.\n\nWhy it matters: A rotation that reached only one region: tokens issued there use a key the other region does not have yet.\n\nSource: `voltage_fleet_agreement{check=\"key_table\"}` \u2014 per-table comparison of `currentNumber`."
     },
     {
       "id": 70,
@@ -2050,7 +2081,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "OK if every fleet member reports the same appliance version.\n\nWhy it matters: Mixed versions across regions are an upgrade in progress or one that was never finished; either way the support clock and behaviour differ per region.\n\nSource: `voltage_fleet_agreement{check=\"version\"}`."
     },
     {
       "id": 72,
@@ -2105,7 +2137,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "The specific targets that disagree with the majority of their fleet, and on which check.\n\nWhy it matters: Names the odd one out so the runbook can start with the right appliance.\n\nSource: `voltage_fleet_member_diverged{fleet,check,key,target} == 1`."
     },
     {
       "id": 74,
@@ -2173,7 +2206,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Classified sensitive columns (PAN, SSN, \u2026) with no entry in voltage-data-map.yml.\n\nWhy it matters: Discovery says PAN, the data map says nothing: the column is in scope and unprotected. This is the PCI scope-drift finding, surfaced by the toolkit instead of the assessor.\n\nSource: `voltage_coverage_columns{state=\"unmapped\"}` \u2014 classification feed \u00d7 data map join, every cycle."
     },
     {
       "id": 77,
@@ -2228,7 +2262,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Columns that are mapped, but whose mapping no longer holds.\n\nWhy it matters: The format is no longer offered by the district, the identity is not declared or not allowed the format, or the classification disagrees with the feed. Protected on paper only.\n\nSource: `voltage_coverage_columns{state=\"broken\"}` \u2014 data map checked against the live policy and desired-state identities."
     },
     {
       "id": 79,
@@ -2279,7 +2314,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Columns whose mapping checks out end to end: format exists, identity allowed.\n\nWhy it matters: The number to put in the scope statement.\n\nSource: `voltage_coverage_columns{state=\"protected\"}`."
     },
     {
       "id": 81,
@@ -2330,7 +2366,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Formats offered by the policy that no column and no identity references.\n\nWhy it matters: Keys for them keep rotating and every rotation is a change to review \u2014 for nothing. Also a hint that something is protected outside the data map.\n\nSource: `voltage_coverage_dead_format{district,format} == 1`."
     },
     {
       "id": 83,
@@ -2390,7 +2427,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Days since the classification feed file was last modified.\n\nWhy it matters: Discovery that has not run in months is not discovery. VoltageClassificationFeedStale fires when the feed is older than configured.\n\nSource: `voltage:coverage_feed_age_days` \u2014 mtime of the classification CSV."
     },
     {
       "id": 85,
@@ -2445,7 +2483,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Every unmapped, broken or unknown column with its classification and the reason.\n\nWhy it matters: The worklist: each row is either a data-map entry to add or a mapping to fix.\n\nSource: `voltage_coverage_column_info{column,classification,state,reason}` \u2014 capped at `max_named_columns` to keep cardinality bounded."
     },
     {
       "id": 87,
@@ -2513,7 +2552,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Number of masking checks (leak, consistency, constant) currently failing.\n\nWhy it matters: Non-production holding production-looking data is an incident, not a finding. Any value above zero means the masked environment should not be handed to developers until re-masked.\n\nSource: `voltage_sdm_mask_ok{check,kind} == 0` \u2014 read from the masked database via SQL or CSV."
     },
     {
       "id": 90,
@@ -2568,7 +2608,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Masking / archive / retention jobs that have not succeeded within their expected interval.\n\nWhy it matters: Batch jobs fail quietly; the first symptom is otherwise a storage bill or a retention violation.\n\nSource: `voltage_sdm_job_stale{job}` \u2014 from the job-history table against `expect_every`."
     },
     {
       "id": 92,
@@ -2623,7 +2664,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Jobs whose most recent run failed.\n\nWhy it matters: If it is the masking refresh, the masked environment may be partial \u2014 see the leak and consistency checks.\n\nSource: `voltage_sdm_job_failing{job}` \u2014 status of the latest row per job in the job history."
     },
     {
       "id": 94,
@@ -2678,7 +2720,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "SDM checks whose database or export file could not be read this cycle.\n\nWhy it matters: Every other SDM number is stale until this is zero; do not trust green tiles while this is red.\n\nSource: `voltage_sdm_check_up == 0`."
     },
     {
       "id": 96,
@@ -2735,7 +2778,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Every masking check with its kind and pass/fail.\n\nWhy it matters: leak = a planted canary appeared in the masked copy; consistency = the same input masked differently across tables (joins silently drop rows); constant = every value identical (a fill-with-X job that 'worked').\n\nSource: `voltage_sdm_mask_ok{check,kind}` with `voltage_sdm_mask_hits` for the count of offending rows."
     },
     {
       "id": 98,
@@ -2792,7 +2836,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Each job and how long ago it last succeeded, longest first.\n\nWhy it matters: The table an operator reads before deciding whether last night's refresh actually happened.\n\nSource: `voltage:sdm_job_hours_since_success` \u2014 recording rule over `voltage_sdm_job_last_success_timestamp_seconds`."
     },
     {
       "id": 100,
@@ -2856,7 +2901,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Number of identities with at least one audit event in the current window.\n\nWhy it matters: The size of the population the anomaly checks watch. A sudden jump is onboarding \u2014 or something enumerating identities.\n\nSource: `voltage_identities_active` \u2014 from the appliance audit export (SQL or CSV)."
     },
     {
       "id": 103,
@@ -2911,7 +2957,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Identity/event pairs whose current-window count is a step change against their baseline.\n\nWhy it matters: Key issuance stepping up for one identity is the control-plane shadow of bulk detokenization by anyone who did not already hold the keys \u2014 or a new batch job, or a rotated secret being retried. Match it to a change; if none, treat it as a precursor.\n\nSource: `voltage_identity_activity_spike{identity,event} == 1` \u2014 current \u2265 spike_ratio \u00d7 median of the previous windows, and \u2265 min_events."
     },
     {
       "id": 105,
@@ -2970,7 +3017,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Failed authentications across all identities in the current window.\n\nWhy it matters: Benign: a secret rotated and one client was not updated. Malicious: credential guessing against a service identity. The client host in the audit export names the source.\n\nSource: `voltage_identity_events{event=\"auth_fail\"}`."
     },
     {
       "id": 107,
@@ -3025,7 +3073,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Identities active now that were never seen in the baseline period, plus identities active but absent from `declared_identities`.\n\nWhy it matters: New identities are a Management Console admin action \u2014 someone created them. Undeclared ones mean the rulebook is behind reality or something nobody approved is authenticating.\n\nSource: `voltage_identity_new` and `voltage_identity_undeclared`."
     },
     {
       "id": 109,
@@ -3086,7 +3135,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Seconds since the newest event in the audit export.\n\nWhy it matters: If the export stops flowing, every tile in this row is blind while staying green. Orange at one window, red at two.\n\nSource: `voltage_identity_audit_age_seconds`."
     },
     {
       "id": 112,
@@ -3135,7 +3185,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "description": "Key-issuance events per identity in each window, over time.\n\nWhy it matters: The shape of normal for each identity. A batch job is a daily pulse; a service is a flat line; a spike is a spike.\n\nSource: `voltage_identity_events{event=\"key_request\"}`."
     },
     {
       "id": 113,
@@ -3192,7 +3243,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Ratio of this window's count to the median of the previous windows, per identity and event.\n\nWhy it matters: 1.0 is normal; 40 is what the demo's batch-etl identity shows when it pulls keys for every format at once. Absent means the identity has no history yet.\n\nSource: `voltage_identity_activity_ratio{identity,event}`."
     },
     {
       "id": 115,
@@ -3260,7 +3312,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Number of restore drills that are within their freshness limit and whose last attempt succeeded.\n\nWhy it matters: A tested restore of the identity backup is the highest-value operational drill in this product: stateless keys have no vault to fall back on. Red means at least one district has not proved it can be rebuilt.\n\nSource: `voltage_restore_drill_ok{drill,district}` \u2014 from the evidence the drill records (ops table or CSV)."
     },
     {
       "id": 118,
@@ -3315,7 +3368,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Drills never tested, or whose last success is older than `max_age`.\n\nWhy it matters: The backup may still be good; nobody has proved it recently, and the appliance version, HSM firmware or Security World may have changed since.\n\nSource: `voltage_restore_drill_overdue`."
     },
     {
       "id": 120,
@@ -3370,7 +3424,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Drills whose most recent attempt failed.\n\nWhy it matters: Until it passes, assume the district cannot be rebuilt after an HSM or appliance loss. Two public restore defects exist in the community wiki; check them before retrying.\n\nSource: `voltage_restore_drill_last_failed`."
     },
     {
       "id": 122,
@@ -3436,7 +3491,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "UP if every HSM monitored by luna-exporter is reachable.\n\nWhy it matters: The HSM holds the district master secret. Its outage does not stop cached clients, but it stops key derivation for anything new \u2014 and it is the root of trust for the whole product.\n\nSource: `luna_up` from luna-exporter (scrape job commented in prometheus/prometheus.yml; 'No data' until it exists)."
     },
     {
       "id": 124,
@@ -3491,7 +3547,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "Tamper events reported by the HSMs.\n\nWhy it matters: Any non-zero value is a physical-security incident and, depending on the HSM's policy, may have zeroised the keys.\n\nSource: `luna_hsm_tamper_events` from luna-exporter."
     },
     {
       "id": 126,
@@ -3557,7 +3614,8 @@
         },
         "colorMode": "value",
         "graphMode": "none"
-      }
+      },
+      "description": "UP if every HSM reports FIPS mode enabled.\n\nWhy it matters: The compliance claim for the root of trust rests on this flag.\n\nSource: `luna_hsm_fips_mode_enabled` from luna-exporter."
     },
     {
       "id": 128,
@@ -3614,7 +3672,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Each drill, its district, and days since the last successful tested restore.\n\nWhy it matters: The number an assessor asks for and nobody usually has.\n\nSource: `voltage:restore_drill_days_since_success` \u2014 recording rule over `voltage_identity_backup_restore_tested_timestamp_seconds`."
     },
     {
       "id": 130,
@@ -3669,7 +3728,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Model, firmware, serial and label of each HSM.\n\nWhy it matters: Firmware changed and no restore drill since is the combination worth a change ticket. Also the place to see an nShield XC that leaves support in 2027.\n\nSource: `luna_hsm_info` from luna-exporter."
     }
   ]
 }

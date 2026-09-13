@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Dashboard explained**: every Grafana panel now carries a description — what it shows, why it matters, where
+  the number comes from — as the (i) tooltip in the panel header, and `docs/DASHBOARD.md` is generated from the
+  same source (`grafana/descriptions.py`) so the two cannot drift. The build fails on a panel nobody explained;
+  CI fails if the JSON or the doc is stale.
 - **Control plane & root of trust** (roadmap R10, R11, R16):
   - R16 `console_url` per target → `voltage_console_up` / `voltage_console_response_seconds`, alert
     `VoltageConsoleUnreachable` (warning; the runbook says protection is unaffected), mock scenario `console-down`.
