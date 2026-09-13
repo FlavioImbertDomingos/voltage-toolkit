@@ -108,6 +108,7 @@ curl -X POST localhost:8800/mock/scenario/errors          # error-rate alert
 curl -X POST localhost:8800/mock/scenario/auth-fail       # auth-failure alert (rotated a secret?)
 curl -X POST localhost:8800/mock/scenario/policy-down     # nothing can start: critical
 curl -X POST localhost:8800/mock/scenario/keyserver-down  # key server alert
+curl -X POST localhost:8800/mock/scenario/console-down    # control plane down; tokenization keeps working (warning, no page)
 curl -X POST localhost:8800/mock/scenario/policy-changed  # drift: a format appeared
 curl -X POST localhost:8800/mock/scenario/key-rotated     # key table PCI: currentNumber 4 -> 5
 curl -X POST localhost:8800/mock/scenario/weak-key        # a 128-bit current key
@@ -123,7 +124,9 @@ valid for 20 days; its `SSN` format keeps the last 4 digits — which leaves a 1
 the 10^6 floor NIST SP 800-38G Rev. 1 requires for FF1; and the demo classification feed lists a
 PAN column (`warehouse.dw.fact_orders.card_no`) that the data map does not cover; and the pretend
 masked non-prod database has one customer row the masking job skipped, plus a masking job that
-is stale and failing. All of them are true of real deployments more often than anyone likes.
+is stale and failing; the seeded audit export shows `batch-etl@demo.bank` pulling keys at 40×
+its baseline and an undeclared identity failing authentication; and the DR identity backup's
+last restore drill failed. All of them are true of real deployments more often than anyone likes.
 
 ### What the metrics look like
 
@@ -192,6 +195,9 @@ See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 | **Can apps tokenize right now?** | The only question that matters at 3 a.m. | `voltage_tokenize_success`<br>`VoltageTokenizationFailing` |
 | **Is the data coming back right?** | A wrong detokenize silently corrupts data | `voltage_tokenize_roundtrip_ok`<br>`VoltageRoundTripMismatch` |
 | **Did masking actually mask?** | A planted canary in non-prod, or joins that silently drop rows | `voltage_sdm_mask_ok{kind}`<br>`SDMMaskLeak`<br>`SDMMaskInconsistent` |
+| **Who is asking for keys, and did that just change?** | Bulk detokenization needs keys; key issuance and auth are what the appliance *can* see (docs/VISIBILITY.md says what it cannot) | `voltage_identity_events{identity,event}`<br>`VoltageIdentityActivitySpike`<br>`VoltageUndeclaredIdentity` |
+| **Has anyone proved the identity backup restores?** | Stateless keys have no vault to fall back on; an unrestorable backup means every token ever issued is gone | `voltage_identity_backup_restore_tested_timestamp_seconds`<br>`VoltageRestoreDrillOverdue`<br>`VoltageRestoreDrillFailed` |
+| **Is the control plane up (and only the control plane)?** | Console outages block changes, not tokenization — an alert that says otherwise trains people to ignore it | `voltage_console_up`<br>`VoltageConsoleUnreachable` |
 | **Did the archive / masking job run?** | Batch jobs fail quietly; the first symptom is a storage bill | `voltage_sdm_job_stale`<br>`SDMJobStale`<br>`SDMJobFailing` |
 | **Is every sensitive column actually protected?** | Discovery says PAN, the data map says nothing — PCI scope drift, in Prometheus rather than next year's ROC | `voltage_coverage_columns{state}`<br>`VoltageUnprotectedSensitiveColumn`<br>`VoltageBrokenProtectionMapping` |
 | **Would a failover work?** | Two regions, same policy, different tokens: every member round-trips fine alone | `voltage_fleet_agreement{check="token"}`<br>`VoltageRegionDivergence` |
@@ -209,7 +215,7 @@ See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 | **Which columns can't be joined?** | eFPE ciphertext differs per key epoch | `voltage_policy_format_efpe` |
 | **Are we running out of support?** | The version is in the policy file; the dates are in the release notes | `voltage_appliance_version_info`<br>`voltage_support_end_timestamp_seconds` |
 
-37 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
+48 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
 routing with inhibition and receivers for PagerDuty and Splunk, a Grafana dashboard, and JSON
 probe events for a SIEM.
 
@@ -230,11 +236,11 @@ voltage-toolkit/
 │   ├── playbooks/                      configure, audit, probe, deploy_exporter, voltage-data-map.yml
 │   ├── docs/ADAPTER.md                 the http / command adapter contract
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
-├── prometheus/                         config + 37 alert rules + promtool tests
+├── prometheus/                         config + 48 alert rules + promtool tests
 ├── alertmanager/ · grafana/            routing, inhibition, PagerDuty + Splunk receivers (secrets/ = demo keys), generated dashboard
 ├── splunk/voltage_toolkit/             installable Splunk app: props, macros, scheduled searches, the SIEM dashboard
 ├── demo/                               seed_nonprod.py + canaries.txt: the pretend masked non-prod database
-└── docs/                               METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, REAL-VOLTAGE, ARCHITECTURE, FAQ
+└── docs/                               METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, VISIBILITY, ROOT-OF-TRUST, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```
 
 ## Status & honesty

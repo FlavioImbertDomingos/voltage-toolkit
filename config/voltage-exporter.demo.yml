@@ -27,6 +27,33 @@ sdm:
       expect_every: 24h
 
 # Is every classified sensitive column actually protected? (see docs/COVERAGE.md)
+# R10a: what the appliance can see -- authentication and key issuance per identity, from an
+# audit export. The demo reads a seeded table; a real deployment points at the Management
+# Console's audit database or a syslog sink. Baseline = median of the previous 24 windows.
+identity_activity:
+  source: {type: sql, dsn: sqlite:////data/nonprod.db}
+  query: SELECT ts, identity, event FROM voltage_audit
+  window: 1h
+  baseline_windows: 24
+  spike_ratio: 5
+  min_events: 20
+  auth_fail_threshold: 10
+  declared_identities: [payments@demo.bank, batch-etl@demo.bank, probe@demo.bank]
+
+# R11: the identity / master-secret backup, proven restorable. Evidence rows come from wherever
+# the drill records them; prod was proven 12 days ago, DR's last attempt failed.
+restore_drills:
+  - name: prod-identity-backup
+    district: prod
+    max_age: 90d
+    source: {type: sql, dsn: sqlite:////data/nonprod.db}
+    query: SELECT drill, finished_at, result FROM restore_drills
+  - name: dr-identity-backup
+    district: dr
+    max_age: 90d
+    source: {type: sql, dsn: sqlite:////data/nonprod.db}
+    query: SELECT drill, finished_at, result FROM restore_drills
+
 coverage:
   classification_csv: /config/classification.csv
   data_map: /config/voltage-data-map.yml
@@ -36,6 +63,7 @@ targets:
   - name: demo-prod
     policy_url: https://voltage:8443/policy/clientPolicy.xml
     ws_url: https://voltage:8443
+    console_url: https://voltage:8443/console/   # Management Console: control plane, one active instance
     api: rest
     identity: probe@demo.bank
     auth:

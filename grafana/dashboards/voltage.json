@@ -579,6 +579,72 @@
     {
       "id": 18,
       "type": "stat",
+      "title": "Mgmt Console",
+      "gridPos": {
+        "x": 20,
+        "y": 5,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(voltage_console_up{target=~\"$target\"})",
+          "legendFormat": "__auto",
+          "refId": "R19",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN \u00b7 control plane",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
       "title": "Policy changes (24h)",
       "gridPos": {
         "x": 8,
@@ -598,7 +664,7 @@
           },
           "expr": "sum(increase(voltage_policy_changes_total{target=~\"$target\"}[24h]))",
           "legendFormat": "__auto",
-          "refId": "R19",
+          "refId": "R21",
           "instant": true,
           "range": false
         }
@@ -632,7 +698,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 22,
       "type": "stat",
       "title": "Probe cycle",
       "gridPos": {
@@ -653,7 +719,7 @@
           },
           "expr": "max(voltage_probe_cycle_seconds{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R21",
+          "refId": "R23",
           "instant": true,
           "range": false
         }
@@ -685,7 +751,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 24,
       "type": "stat",
       "title": "Last probe",
       "gridPos": {
@@ -706,7 +772,7 @@
           },
           "expr": "time() - max(voltage_probe_last_run_timestamp_seconds{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R23",
+          "refId": "R25",
           "instant": true,
           "range": false
         }
@@ -746,7 +812,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 26,
       "type": "stat",
       "title": "Silent-corruption checks",
       "gridPos": {
@@ -767,7 +833,7 @@
           },
           "expr": "min(voltage_integrity_ok{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R25",
+          "refId": "R27",
           "instant": true,
           "range": false
         }
@@ -812,7 +878,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 28,
       "type": "row",
       "title": "Latency & errors",
       "collapsed": false,
@@ -825,7 +891,7 @@
       "panels": []
     },
     {
-      "id": 30,
+      "id": 32,
       "type": "timeseries",
       "title": "protect latency p50 / p95 / p99",
       "gridPos": {
@@ -846,7 +912,7 @@
           },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p50",
-          "refId": "R27"
+          "refId": "R29"
         },
         {
           "datasource": {
@@ -855,7 +921,7 @@
           },
           "expr": "histogram_quantile(0.95, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p95",
-          "refId": "R28"
+          "refId": "R30"
         },
         {
           "datasource": {
@@ -864,7 +930,7 @@
           },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(voltage_protect_seconds_bucket{target=~\"$target\"}[5m])))",
           "legendFormat": "p99",
-          "refId": "R29"
+          "refId": "R31"
         }
       ],
       "fieldConfig": {
@@ -909,7 +975,7 @@
       }
     },
     {
-      "id": 32,
+      "id": 34,
       "type": "timeseries",
       "title": "access latency p95 by format",
       "gridPos": {
@@ -930,7 +996,7 @@
           },
           "expr": "voltage:access_p95_seconds_10m{target=~\"$target\"}",
           "legendFormat": "{{target}} {{format}}",
-          "refId": "R31"
+          "refId": "R33"
         }
       ],
       "fieldConfig": {
@@ -959,7 +1025,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 36,
       "type": "timeseries",
       "title": "Error ratio by format (10m)",
       "gridPos": {
@@ -980,7 +1046,7 @@
           },
           "expr": "voltage:tokenize_error_ratio_10m{target=~\"$target\"}",
           "legendFormat": "{{target}} {{format}}",
-          "refId": "R33"
+          "refId": "R35"
         }
       ],
       "fieldConfig": {
@@ -1027,7 +1093,7 @@
       }
     },
     {
-      "id": 36,
+      "id": 38,
       "type": "timeseries",
       "title": "Failures by kind (per 10m)",
       "gridPos": {
@@ -1048,7 +1114,7 @@
           },
           "expr": "sum by (kind) (increase(voltage_tokenize_errors_total{target=~\"$target\"}[10m]))",
           "legendFormat": "{{kind}}",
-          "refId": "R35"
+          "refId": "R37"
         }
       ],
       "fieldConfig": {
@@ -1076,7 +1142,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 39,
       "type": "row",
       "title": "Configuration & certificates",
       "collapsed": false,
@@ -1089,7 +1155,7 @@
       "panels": []
     },
     {
-      "id": 38,
+      "id": 40,
       "type": "table",
       "title": "Formats offered by the policy",
       "gridPos": {
@@ -1110,7 +1176,7 @@
           },
           "expr": "voltage_policy_format{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R39",
+          "refId": "R41",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1144,7 +1210,7 @@
       }
     },
     {
-      "id": 40,
+      "id": 42,
       "type": "table",
       "title": "Certificates: days to expiry",
       "gridPos": {
@@ -1165,7 +1231,7 @@
           },
           "expr": "sort(voltage:certificate_days_until_expiry{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R41",
+          "refId": "R43",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1201,7 +1267,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 44,
       "type": "table",
       "title": "Policy",
       "gridPos": {
@@ -1222,7 +1288,7 @@
           },
           "expr": "voltage_policy_info{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R43",
+          "refId": "R45",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1256,7 +1322,7 @@
       }
     },
     {
-      "id": 44,
+      "id": 46,
       "type": "row",
       "title": "What the policy says about the crypto",
       "collapsed": false,
@@ -1269,7 +1335,7 @@
       "panels": []
     },
     {
-      "id": 45,
+      "id": 47,
       "type": "stat",
       "title": "Formats under NIST's 10^6 domain floor",
       "gridPos": {
@@ -1290,7 +1356,7 @@
           },
           "expr": "sum(voltage_format_below_minimum_domain{target=~\"$target\"}) or vector(0)",
           "legendFormat": "__auto",
-          "refId": "R46",
+          "refId": "R48",
           "instant": true,
           "range": false
         }
@@ -1324,7 +1390,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 49,
       "type": "stat",
       "title": "eFPE formats (not join-safe)",
       "gridPos": {
@@ -1344,57 +1410,6 @@
             "uid": "prometheus"
           },
           "expr": "count(voltage_policy_format_efpe{target=~\"$target\"}) or vector(0)",
-          "legendFormat": "__auto",
-          "refId": "R48",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 49,
-      "type": "stat",
-      "title": "Key rotations (24h)",
-      "gridPos": {
-        "x": 8,
-        "y": 40,
-        "w": 4,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(voltage_key_rotations_total{target=~\"$target\"}[24h])) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R50",
           "instant": true,
@@ -1428,6 +1443,57 @@
     {
       "id": 51,
       "type": "stat",
+      "title": "Key rotations (24h)",
+      "gridPos": {
+        "x": 8,
+        "y": 40,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(voltage_key_rotations_total{target=~\"$target\"}[24h])) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R52",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 53,
+      "type": "stat",
       "title": "Weakest current key (bits)",
       "gridPos": {
         "x": 12,
@@ -1447,7 +1513,7 @@
           },
           "expr": "min(voltage_key_current_size_bits{target=~\"$target\"} > 0)",
           "legendFormat": "__auto",
-          "refId": "R52",
+          "refId": "R54",
           "instant": true,
           "range": false
         }
@@ -1481,7 +1547,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 55,
       "type": "stat",
       "title": "Days of vendor support left",
       "gridPos": {
@@ -1502,7 +1568,7 @@
           },
           "expr": "min(voltage:support_days_remaining{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R54",
+          "refId": "R56",
           "instant": true,
           "range": false
         }
@@ -1541,7 +1607,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 57,
       "type": "table",
       "title": "Key tables",
       "gridPos": {
@@ -1562,7 +1628,7 @@
           },
           "expr": "voltage_key_table_current_number{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R56",
+          "refId": "R58",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1598,7 +1664,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 59,
       "type": "table",
       "title": "FPE domain size per format",
       "gridPos": {
@@ -1619,7 +1685,7 @@
           },
           "expr": "sort(voltage_format_domain_size{target=~\"$target\"})",
           "legendFormat": "__auto",
-          "refId": "R58",
+          "refId": "R60",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1655,7 +1721,7 @@
       }
     },
     {
-      "id": 59,
+      "id": 61,
       "type": "table",
       "title": "Appliance version",
       "gridPos": {
@@ -1676,7 +1742,7 @@
           },
           "expr": "voltage_appliance_version_info{target=~\"$target\"}",
           "legendFormat": "__auto",
-          "refId": "R60",
+          "refId": "R62",
           "instant": true,
           "range": false,
           "format": "table"
@@ -1710,7 +1776,7 @@
       }
     },
     {
-      "id": 61,
+      "id": 63,
       "type": "row",
       "title": "Fleet agreement \u2014 do all members give the same answers?",
       "collapsed": false,
@@ -1723,7 +1789,7 @@
       "panels": []
     },
     {
-      "id": 62,
+      "id": 64,
       "type": "stat",
       "title": "Tokens agree",
       "gridPos": {
@@ -1743,72 +1809,6 @@
             "uid": "prometheus"
           },
           "expr": "min(voltage_fleet_agreement{check=\"token\"})",
-          "legendFormat": "__auto",
-          "refId": "R63",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "FAIL",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 64,
-      "type": "stat",
-      "title": "Policy agrees",
-      "gridPos": {
-        "x": 4,
-        "y": 56,
-        "w": 4,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "min(voltage_fleet_agreement{check=\"policy\"})",
           "legendFormat": "__auto",
           "refId": "R65",
           "instant": true,
@@ -1857,9 +1857,9 @@
     {
       "id": 66,
       "type": "stat",
-      "title": "Key tables agree",
+      "title": "Policy agrees",
       "gridPos": {
-        "x": 8,
+        "x": 4,
         "y": 56,
         "w": 4,
         "h": 4
@@ -1874,7 +1874,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "min(voltage_fleet_agreement{check=\"key_table\"})",
+          "expr": "min(voltage_fleet_agreement{check=\"policy\"})",
           "legendFormat": "__auto",
           "refId": "R67",
           "instant": true,
@@ -1923,9 +1923,9 @@
     {
       "id": 68,
       "type": "stat",
-      "title": "Versions agree",
+      "title": "Key tables agree",
       "gridPos": {
-        "x": 12,
+        "x": 8,
         "y": 56,
         "w": 4,
         "h": 4
@@ -1940,7 +1940,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "min(voltage_fleet_agreement{check=\"version\"})",
+          "expr": "min(voltage_fleet_agreement{check=\"key_table\"})",
           "legendFormat": "__auto",
           "refId": "R69",
           "instant": true,
@@ -1988,6 +1988,72 @@
     },
     {
       "id": 70,
+      "type": "stat",
+      "title": "Versions agree",
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(voltage_fleet_agreement{check=\"version\"})",
+          "legendFormat": "__auto",
+          "refId": "R71",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAIL",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 72,
       "type": "table",
       "title": "Diverged members",
       "gridPos": {
@@ -2008,7 +2074,7 @@
           },
           "expr": "voltage_fleet_member_diverged == 1",
           "legendFormat": "__auto",
-          "refId": "R71",
+          "refId": "R73",
           "instant": true,
           "range": false,
           "format": "table"
@@ -2042,7 +2108,7 @@
       }
     },
     {
-      "id": 72,
+      "id": 74,
       "type": "row",
       "title": "Coverage \u2014 is every classified sensitive column protected?",
       "collapsed": false,
@@ -2055,7 +2121,7 @@
       "panels": []
     },
     {
-      "id": 73,
+      "id": 75,
       "type": "stat",
       "title": "Unmapped sensitive columns",
       "gridPos": {
@@ -2076,7 +2142,7 @@
           },
           "expr": "sum(voltage_coverage_columns{state=\"unmapped\"}) or vector(0)",
           "legendFormat": "__auto",
-          "refId": "R74",
+          "refId": "R76",
           "instant": true,
           "range": false
         }
@@ -2110,7 +2176,7 @@
       }
     },
     {
-      "id": 75,
+      "id": 77,
       "type": "stat",
       "title": "Broken mappings",
       "gridPos": {
@@ -2131,7 +2197,7 @@
           },
           "expr": "sum(voltage_coverage_columns{state=\"broken\"}) or vector(0)",
           "legendFormat": "__auto",
-          "refId": "R76",
+          "refId": "R78",
           "instant": true,
           "range": false
         }
@@ -2165,7 +2231,7 @@
       }
     },
     {
-      "id": 77,
+      "id": 79,
       "type": "stat",
       "title": "Protected columns",
       "gridPos": {
@@ -2185,57 +2251,6 @@
             "uid": "prometheus"
           },
           "expr": "sum(voltage_coverage_columns{state=\"protected\"}) or vector(0)",
-          "legendFormat": "__auto",
-          "refId": "R78",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 79,
-      "type": "stat",
-      "title": "Dead formats",
-      "gridPos": {
-        "x": 12,
-        "y": 67,
-        "w": 4,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "count(voltage_coverage_dead_format == 1) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R80",
           "instant": true,
@@ -2269,6 +2284,57 @@
     {
       "id": 81,
       "type": "stat",
+      "title": "Dead formats",
+      "gridPos": {
+        "x": 12,
+        "y": 67,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(voltage_coverage_dead_format == 1) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R82",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 83,
+      "type": "stat",
       "title": "Feed age (days)",
       "gridPos": {
         "x": 16,
@@ -2288,7 +2354,7 @@
           },
           "expr": "voltage:coverage_feed_age_days",
           "legendFormat": "__auto",
-          "refId": "R82",
+          "refId": "R84",
           "instant": true,
           "range": false
         }
@@ -2327,7 +2393,7 @@
       }
     },
     {
-      "id": 83,
+      "id": 85,
       "type": "table",
       "title": "Columns not protected",
       "gridPos": {
@@ -2348,7 +2414,7 @@
           },
           "expr": "voltage_coverage_column_info",
           "legendFormat": "__auto",
-          "refId": "R84",
+          "refId": "R86",
           "instant": true,
           "range": false,
           "format": "table"
@@ -2382,7 +2448,7 @@
       }
     },
     {
-      "id": 85,
+      "id": 87,
       "type": "row",
       "title": "Structured Data Manager \u2014 masked data and jobs",
       "collapsed": false,
@@ -2395,7 +2461,7 @@
       "panels": []
     },
     {
-      "id": 86,
+      "id": 88,
       "type": "stat",
       "title": "Masking checks failing",
       "gridPos": {
@@ -2416,7 +2482,7 @@
           },
           "expr": "count(voltage_sdm_mask_ok == 0) or vector(0)",
           "legendFormat": "__auto",
-          "refId": "R87",
+          "refId": "R89",
           "instant": true,
           "range": false
         }
@@ -2450,7 +2516,7 @@
       }
     },
     {
-      "id": 88,
+      "id": 90,
       "type": "stat",
       "title": "Jobs stale",
       "gridPos": {
@@ -2470,61 +2536,6 @@
             "uid": "prometheus"
           },
           "expr": "sum(voltage_sdm_job_stale) or vector(0)",
-          "legendFormat": "__auto",
-          "refId": "R89",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 90,
-      "type": "stat",
-      "title": "Jobs failing",
-      "gridPos": {
-        "x": 8,
-        "y": 79,
-        "w": 4,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(voltage_sdm_job_failing) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R91",
           "instant": true,
@@ -2562,9 +2573,9 @@
     {
       "id": 92,
       "type": "stat",
-      "title": "Sources unreadable",
+      "title": "Jobs failing",
       "gridPos": {
-        "x": 12,
+        "x": 8,
         "y": 79,
         "w": 4,
         "h": 4
@@ -2579,7 +2590,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count(voltage_sdm_check_up == 0) or vector(0)",
+          "expr": "sum(voltage_sdm_job_failing) or vector(0)",
           "legendFormat": "__auto",
           "refId": "R93",
           "instant": true,
@@ -2616,6 +2627,61 @@
     },
     {
       "id": 94,
+      "type": "stat",
+      "title": "Sources unreadable",
+      "gridPos": {
+        "x": 12,
+        "y": 79,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(voltage_sdm_check_up == 0) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R95",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 96,
       "type": "table",
       "title": "Masking checks",
       "gridPos": {
@@ -2636,7 +2702,7 @@
           },
           "expr": "voltage_sdm_mask_ok",
           "legendFormat": "__auto",
-          "refId": "R95",
+          "refId": "R97",
           "instant": true,
           "range": false,
           "format": "table"
@@ -2672,7 +2738,7 @@
       }
     },
     {
-      "id": 96,
+      "id": 98,
       "type": "table",
       "title": "Jobs: hours since last success",
       "gridPos": {
@@ -2693,7 +2759,7 @@
           },
           "expr": "sort_desc(voltage:sdm_job_hours_since_success)",
           "legendFormat": "__auto",
-          "refId": "R97",
+          "refId": "R99",
           "instant": true,
           "range": false,
           "format": "table"
@@ -2712,6 +2778,883 @@
             "renameByName": {
               "Value": "hours"
             }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Identity activity \u2014 what the appliance can see (auth + key issuance)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 90,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 101,
+      "type": "stat",
+      "title": "Identities active",
+      "gridPos": {
+        "x": 0,
+        "y": 91,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "voltage_identities_active",
+          "legendFormat": "__auto",
+          "refId": "R102",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 103,
+      "type": "stat",
+      "title": "Spikes now",
+      "gridPos": {
+        "x": 4,
+        "y": 91,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(voltage_identity_activity_spike) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R104",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 105,
+      "type": "stat",
+      "title": "Auth failures (window)",
+      "gridPos": {
+        "x": 8,
+        "y": 91,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(voltage_identity_events{event=\"auth_fail\"}) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R106",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 107,
+      "type": "stat",
+      "title": "New / undeclared",
+      "gridPos": {
+        "x": 12,
+        "y": 91,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(count(voltage_identity_new) or vector(0)) + (count(voltage_identity_undeclared) or vector(0))",
+          "legendFormat": "__auto",
+          "refId": "R108",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 109,
+      "type": "stat",
+      "title": "Audit export age",
+      "gridPos": {
+        "x": 16,
+        "y": 91,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "voltage_identity_audit_age_seconds",
+          "legendFormat": "__auto",
+          "refId": "R110",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 3600
+              },
+              {
+                "color": "red",
+                "value": 7200
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 112,
+      "type": "timeseries",
+      "title": "Key requests per window, by identity",
+      "gridPos": {
+        "x": 0,
+        "y": 95,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "voltage_identity_events{event=\"key_request\"}",
+          "legendFormat": "{{identity}}",
+          "refId": "R111"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 113,
+      "type": "table",
+      "title": "Current window vs baseline",
+      "gridPos": {
+        "x": 12,
+        "y": 95,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "voltage_identity_activity_ratio",
+          "legendFormat": "__auto",
+          "refId": "R114",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "Value": "ratio"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 115,
+      "type": "row",
+      "title": "Root of trust \u2014 HSM (luna-exporter) and the identity backup restore drill",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 102,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 116,
+      "type": "stat",
+      "title": "Restore drills OK",
+      "gridPos": {
+        "x": 0,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(voltage_restore_drill_ok) or vector(0))",
+          "legendFormat": "__auto",
+          "refId": "R117",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 118,
+      "type": "stat",
+      "title": "Drills overdue / never",
+      "gridPos": {
+        "x": 4,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(voltage_restore_drill_overdue) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R119",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 120,
+      "type": "stat",
+      "title": "Last drill failed",
+      "gridPos": {
+        "x": 8,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(voltage_restore_drill_last_failed) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R121",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 122,
+      "type": "stat",
+      "title": "HSMs up (luna_up)",
+      "gridPos": {
+        "x": 12,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(luna_up)",
+          "legendFormat": "__auto",
+          "refId": "R123",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 124,
+      "type": "stat",
+      "title": "HSM tamper events",
+      "gridPos": {
+        "x": 16,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(luna_hsm_tamper_events) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "R125",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 126,
+      "type": "stat",
+      "title": "HSM FIPS mode",
+      "gridPos": {
+        "x": 20,
+        "y": 103,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(luna_hsm_fips_mode_enabled)",
+          "legendFormat": "__auto",
+          "refId": "R127",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 128,
+      "type": "table",
+      "title": "Restore drills: days since last tested restore",
+      "gridPos": {
+        "x": 0,
+        "y": 107,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sort_desc(voltage:restore_drill_days_since_success)",
+          "legendFormat": "__auto",
+          "refId": "R129",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "Value": "days"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 130,
+      "type": "table",
+      "title": "HSM inventory (luna-exporter)",
+      "gridPos": {
+        "x": 12,
+        "y": 107,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "luna_hsm_info",
+          "legendFormat": "__auto",
+          "refId": "R131",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {}
           }
         }
       ],

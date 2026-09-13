@@ -106,6 +106,26 @@ same facts for a forwarder. Vendor delivery (PagerDuty, Splunk) lives entirely i
 receivers and the log pipeline; nothing in the exporter knows a vendor name
 (`docs/INTEGRATIONS.md`).
 
+**Why the console is its own series (R16):** the data path is active/active, the control plane
+is not — the Security Target says one Management Console instance is active per deployment.
+`console_url` is probed separately, `voltage_console_up` alerts at warning, and the runbook
+line says protection is unaffected, because an alert that cries "Voltage is down" for a
+control-plane outage teaches people to ignore the one that matters.
+
+**Why identity activity reads an audit export, not the probe (R10a):** the exporter's own
+traffic proves the service works; it says nothing about who else is using it. The appliance's
+audit log carries authentication and key issuance per identity — the control-plane edge of
+every workload and, as `docs/VISIBILITY.md` explains, the only edge the appliance sees once a
+client has cached its keys. `identity_activity.py` is a pure function over (timestamp,
+identity, event) rows: current window vs the median of the previous N, so a step change is a
+number rather than a feeling, and cardinality is capped before it reaches Prometheus.
+
+**Why a restore drill is a metric (R11):** `restore_drills.py` reads the evidence a drill leaves
+behind and reports last-success age, last-attempt outcome and overdue-ness per district. The
+metric name, `voltage_identity_backup_restore_tested_timestamp_seconds`, is deliberately long:
+it is the one number in this project that, if it stops moving, means the data can be lost
+rather than merely unavailable.
+
 ## Collection
 
 ```

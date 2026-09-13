@@ -6,6 +6,7 @@ Serves the three things a SecureData client touches:
   POST /vibesimple/rest/v1/protect  and  /access       REST Web Services API (JSON)
   POST /vibesimple/services/VibeSimpleSOAP             SOAP Web Services API (ProtectFormattedData / AccessFormattedData)
   GET  /vibekeys/                                     a stand-in key server endpoint
+  GET  /console/                                      a stand-in Management Console (control plane)
 
 "FPE" here is a toy, reversible, format-preserving substitution keyed by a secret.
 It preserves length and character classes like FF1 does, and it is NOT
@@ -20,6 +21,7 @@ Scenarios (switch at runtime: `curl -X POST localhost:8800/mock/scenario/slow`):
   auth-fail       every Web Services call answers 401
   policy-down     clientPolicy.xml returns 503 (nothing can start)
   keyserver-down  /vibekeys/ returns 503
+  console-down    /console/ returns 503 (protection unaffected)
   policy-changed  a new format appears in the policy (drift)
   key-rotated     key table PCI: currentNumber 4 -> 5
   weak-key        key table PII current key drops to 128-bit
@@ -125,6 +127,7 @@ SCENARIOS = {
     "auth-fail": "Every Web Services call answers 401.",
     "policy-down": "clientPolicy.xml returns 503.",
     "keyserver-down": "The key server endpoint returns 503.",
+    "console-down": "The Management Console (/console/) returns 503; protection keeps working.",
     "policy-changed": "A new format (PHONE) appears in the policy.",
     "key-rotated": "Key table PCI rotates: currentNumber 4 -> 5 (a new 256-bit key appears).",
     "weak-key": "Key table PII's current key is 128-bit.",
@@ -363,6 +366,16 @@ def client_policy():
 </clientPolicy>
 """
     return Response(xml, mimetype="application/xml")
+
+
+@app.get("/console/")
+def console():
+    """Stand-in Management Console login page: the control plane, one active instance per deployment."""
+    if scenario() == "console-down":
+        return Response("management console unavailable\n", 503)
+    return Response(
+        "<html><title>SecureData Management Console</title><body>login</body></html>", 200
+    )
 
 
 @app.get("/vibekeys/")

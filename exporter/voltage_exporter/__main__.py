@@ -85,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{t.name}] tls {c.host}:{c.port}: " + (f"ok, expires {days}d" if c.ok else f"FAIL {c.error}"))
             for url, up in r.keyservers.items():
                 print(f"[{t.name}] keyserver {url}: {'up' if up else 'DOWN'}")
+            if r.console_up is not None:
+                print(f"[{t.name}] management console: {'up' if r.console_up else 'DOWN (control plane only)'}")
         from .fleet import evaluate as evaluate_fleet
 
         if config.coverage:
@@ -108,6 +110,33 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"[coverage] dead formats in {d}: {', '.join(fmts)}")
                 for e in rep.errors:
                     print(f"[coverage] error: {e}")
+        if config.identity_activity:
+            from . import identity_activity as ia
+
+            ia_cfg = ia.parse_config(config.identity_activity)
+            rep = ia.run(ia_cfg) if ia_cfg else None
+            if rep is not None:
+                if rep.ok is None:
+                    print(f"[identity-activity] could not read the audit export: {rep.detail}")
+                    rc = 1
+                else:
+                    print(f"[identity-activity] {rep.detail}")
+                    for w in rep.spikes:
+                        print(f"[identity-activity] SPIKE {w.identity} {w.event}: {w.current} vs {w.baseline}")
+                    for ident, n in rep.auth_failures.items():
+                        if n >= ia_cfg.auth_fail_threshold:
+                            print(f"[identity-activity] AUTH FAILURES {ident}: {n} this window")
+                    if rep.spikes or rep.undeclared:
+                        rc = 1
+        if config.restore_drills:
+            from . import restore_drills as rd
+
+            for d in rd.parse_config(config.restore_drills):
+                r = rd.run(d)
+                tag = "unreadable" if r.ok is None else ("ok" if r.ok else "OVERDUE" if r.overdue else "FAILED")
+                print(f"[restore-drill] {d.name} ({d.district}): {tag} -- {r.detail}")
+                if not r.ok:
+                    rc = 1
         if config.sdm:
             from .sdm import parse_config, run_job_check, run_mask_check
 

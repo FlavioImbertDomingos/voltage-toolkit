@@ -7,6 +7,25 @@ exporter:
   log_level: INFO
   log_format: text           # json = one event per target per cycle, for Splunk & co. (docs/INTEGRATIONS.md)
 
+# Optional: identity activity from the appliance audit export (R10a). See docs/VISIBILITY.md for
+# what this can and cannot see.
+# identity_activity:
+#   source: {type: sql, driver: psycopg2, dsn: postgresql://ro@mc-db.example.com/voltage_audit, password_env: AUDIT_DB_PASSWORD}
+#   query: SELECT event_time, identity, event_type FROM audit_events WHERE event_time > now() - interval '25 hours'
+#   window: 1h
+#   baseline_windows: 24
+#   spike_ratio: 5
+#   min_events: 20
+#   declared_identities: [payments@example.bank, batch-etl@example.bank, probe@example.bank]
+
+# Optional: restore-drill freshness (R11). One entry per identity backup you must be able to restore.
+# restore_drills:
+#   - name: prod-identity-backup
+#     district: prod
+#     max_age: 90d
+#     source: {type: file, path: /evidence/restore-drills.csv}
+#     columns: [drill, finished_at, result]
+
 # Optional: Structured Data Manager checks -- masked non-prod data and job history. See docs/SDM.md.
 # sdm:
 #   masking:
@@ -35,6 +54,7 @@ targets:
   - name: prod
     policy_url: https://voltage-pp-0000.example.com/policy/clientPolicy.xml
     ws_url: https://voltage-pp-0000.example.com      # host serving /vibesimple/...
+    # console_url: https://voltage-mc.example.com/    # optional: Management Console reachability (control plane)
     api: rest                                        # rest | soap
     identity: monitor-probe@example.com              # a dedicated, low-privilege probe identity
     auth:

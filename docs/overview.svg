@@ -60,7 +60,7 @@
   <!-- prometheus -->
   <rect x="740" y="152" width="190" height="92" rx="10" fill="#ffffff" stroke="#8fa3b8" stroke-width="2"/>
   <text x="835" y="180" text-anchor="middle" class="h">Prometheus</text>
-  <text x="835" y="200" text-anchor="middle" class="t">37 alert rules</text>
+  <text x="835" y="200" text-anchor="middle" class="t">48 alert rules</text>
   <text x="835" y="218" text-anchor="middle" class="t">promtool-tested</text>
   <text x="835" y="236" text-anchor="middle" class="cap">p95 · error ratio · days-left</text>
   <path d="M356 350 H700 V198 H732" stroke="#2457c5" stroke-width="2.5" fill="none" marker-end="url(#ab)"/>

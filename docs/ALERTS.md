@@ -9,6 +9,7 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageProbesStale` | no probe cycle in 5 min | 1m | warning | Loop stuck or every call timing out; read exporter logs |
 | `VoltagePolicyUnreachable` | `voltage_policy_up == 0` | 2m | critical | New app instances cannot start. Check the policy host, load balancer, DNS (`voltage-pp-0000`), TLS |
 | `VoltageKeyServerDown` | key server URL failing | 2m | critical | Cached keys keep working; new identities / rotations fail. Check `/vibekeys` host |
+| `VoltageConsoleUnreachable` | `voltage_console_up == 0` | 5m | warning | **Control plane only** — tokenization is unaffected. No policy change, new identity or audit review until fixed; do not page, do fix before the next change window |
 | `VoltageTokenizationFailing` | round-trip failing | 2m | critical | Look at `voltage_tokenize_errors_total{kind}`: auth → credential rotated; http → appliance error; timeout/connection → network or load |
 | `VoltageAuthFailures` | any `kind="auth"` error in 10m | — | warning | Probe identity's secret rejected: rotated secret, LDAP change, identity disabled |
 | `VoltageRoundTripMismatch` | `access(protect(x)) != x` | — | critical | **Data integrity.** Stop writes; check district / key configuration before tokens are persisted |
@@ -30,6 +31,16 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `SDMJobStale` | no success within `expect_every` | 1h | warning | Archive / retention / masking runs fail quietly |
 | `SDMJobFailing` | latest run failed | — | warning | Check the job's own log |
 | `SDMSourceUnreadable` | check cannot read its source | 15m | warning | DB / credentials / query / export file |
+| `VoltageIdentityActivitySpike` | key requests ≥ `spike_ratio` × baseline for one identity | 5m | warning | New batch job, restart storm, rotated secret retried, or keys pulled for every format at once — the control-plane shadow of bulk detokenization. Match to a change or job schedule |
+| `VoltageIdentityAuthFailures` | ≥ 10 `auth_fail` in a window | 5m | warning | A secret rotated and one client missed it, or credential guessing; the client host in the audit export names the source |
+| `VoltageNewIdentityActive` | identity active, never seen in baseline | — | info | Expected after onboarding; otherwise ask who created it (a console admin action) |
+| `VoltageUndeclaredIdentity` | active but not in `declared_identities` | 10m | warning | Rulebook behind reality (fix config-as-code) or something nobody approved |
+| `VoltageIdentityAuditStale` | newest audit event older than 2 windows | 15m | warning | Export/forwarding stopped; the identity alerts are blind |
+| `VoltageIdentityAuditUnreadable` | audit export unreadable | 15m | warning | DB / credentials / query / export file |
+| `VoltageRestoreDrillNeverTested` | no successful tested restore on record | 1h | warning | Schedule the drill (docs/ROOT-OF-TRUST.md); an unrestorable identity backup means every token is unrecoverable |
+| `VoltageRestoreDrillOverdue` | last success older than `max_age` | 1h | warning | Run the drill; version, firmware or Security World may have changed since |
+| `VoltageRestoreDrillFailed` | most recent attempt failed | — | critical | Assume the district cannot be rebuilt until it passes; check the two public restore defects first |
+| `VoltageRestoreDrillEvidenceUnreadable` | evidence source unreadable | 1h | warning | Fix the source before trusting the freshness alert either way |
 | `VoltageErrorRateHigh` | > 5 % failures over 10m | 5m | warning | Intermittent errors apps are retrying around |
 | `VoltageLatencyHigh` | p95 protect > 500 ms | 5m | warning | Appliance load, key server, network path, key rotation in progress |
 | `VoltageFormatNotPreserved` | token shape ≠ sample shape | 2m | warning | Wrong format bound to the identity, or a tokenization format used where FPE expected |

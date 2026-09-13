@@ -118,9 +118,50 @@ finding: a region built from its own district instead of the shared backup.
 | `voltage_certificate_expiry_timestamp_seconds` | gauge | `host`, `subject` | notAfter of the presented certificate |
 | `voltage_tls_version_info` | gauge | `host`, `version` | Negotiated TLS version |
 | `voltage_keyserver_up` | gauge | `url` | Key server URL (from the policy) answered |
+| `voltage_console_up` | gauge | — | Management Console answered (`console_url`). **Control plane only**: 0 blocks policy changes and admin work, not tokenization. Only one console instance is active per deployment |
+| `voltage_console_response_seconds` | gauge | — | Console response time |
 
 Hosts probed for TLS: the policy host, the Web Services host, every key server in the policy,
-and `extra_tls_hosts` from config.
+the console if configured, and `extra_tls_hosts` from config.
+
+## Identity activity — what the appliance *can* see (R10a)
+
+From the appliance audit export (`identity_activity:`); see [VISIBILITY.md](VISIBILITY.md) for
+why per-transaction protect/access counts are not, and cannot be, here.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_identity_activity_up` | gauge | — | Audit export readable and evaluated |
+| `voltage_identity_events` | gauge | `identity`, `event` | Events in the current window (`auth_ok`, `auth_fail`, `key_request`, …) |
+| `voltage_identity_events_baseline` | gauge | `identity`, `event` | Median per window over the previous `baseline_windows` |
+| `voltage_identity_activity_ratio` | gauge | `identity`, `event` | Current / baseline; absent when there is no history |
+| `voltage_identity_activity_spike` | gauge | `identity`, `event` | 1 when current ≥ `spike_ratio` × baseline and ≥ `min_events` |
+| `voltage_identity_new` | gauge | `identity` | Active now, never seen in the baseline period |
+| `voltage_identity_undeclared` | gauge | `identity` | Active now, absent from `declared_identities` |
+| `voltage_identities_active` | gauge | — | Identities with any event this window |
+| `voltage_identity_audit_age_seconds` | gauge | — | Age of the newest audit event |
+| `voltage_identity_activity_window_seconds` | gauge | — | The window the counts cover |
+
+Cardinality is capped by `max_identities` (default 200, busiest kept).
+
+## Root of trust — restore drills (R11)
+
+From `restore_drills:`; see [ROOT-OF-TRUST.md](ROOT-OF-TRUST.md) for the drill itself.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `voltage_restore_drill_up` | gauge | `drill`, `district` | Evidence source readable |
+| `voltage_restore_drill_ok` | gauge | `drill`, `district` | Within `max_age` and the latest attempt succeeded |
+| `voltage_identity_backup_restore_tested_timestamp_seconds` | gauge | `drill`, `district` | Last successful, tested restore of the identity backup |
+| `voltage_restore_drill_last_attempt_timestamp_seconds` | gauge | `drill`, `district` | Last attempt, success or not |
+| `voltage_restore_drill_overdue` | gauge | `drill`, `district` | Never tested, or older than `max_age` |
+| `voltage_restore_drill_last_failed` | gauge | `drill`, `district` | Most recent attempt failed |
+| `voltage_restore_drill_max_age_seconds` | gauge | `drill`, `district` | Configured freshness limit |
+
+The Grafana "Root of trust" row pairs these with `luna_up`, `luna_hsm_info`,
+`luna_hsm_tamper_events` and `luna_hsm_fips_mode_enabled` from
+[luna-exporter](https://github.com/FlavioImbertDomingos/luna-exporter) (scrape job commented in
+`prometheus/prometheus.yml`).
 
 ## Exporter
 
@@ -137,6 +178,7 @@ and `extra_tls_hosts` from config.
 |---|---|
 | `voltage:tokenize_error_ratio_10m` | failures / all probes over 10 min, per target and format |
 | `voltage:protect_p95_seconds_10m` / `voltage:access_p95_seconds_10m` | p95 latency over 10 min |
+| `voltage:restore_drill_days_since_success` | days since the last tested restore, per drill |
 | `voltage:sdm_job_hours_since_success` | Hours since an SDM job last succeeded |
 | `voltage:coverage_feed_age_days` | Age of the classification feed |
 | `voltage:support_days_remaining` | Days until the running appliance version leaves vendor maintenance (negative = out of support) |

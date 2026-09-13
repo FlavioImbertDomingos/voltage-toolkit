@@ -103,6 +103,7 @@ class Target:
     extra_tls_hosts: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
     fleet: str = ""  # targets with the same fleet name are expected to agree (R4 / R15)
+    console_url: str = ""  # Management Console (control plane); "" = not probed (R16)
     integrity_determinism: bool = True
     integrity_double_protect: bool = True
     integrity_format_isolation: bool = True
@@ -130,6 +131,8 @@ class Config:
     support_end: dict = field(default_factory=dict)  # version prefix -> ISO date | {release, end}
     coverage: CoverageConfig | None = None
     sdm: dict | None = None  # raw `sdm:` block; parsed by sdm.parse_config (masking checks, jobs)
+    identity_activity: dict | None = None  # raw block; parsed by identity_activity.parse_config (R10a)
+    restore_drills: list | None = None  # raw list; parsed by restore_drills.parse_config (R11)
 
 
 def _secret(entry: dict, name: str, key: str = "secret") -> str:
@@ -211,6 +214,7 @@ def _target(entry: dict) -> Target:
         extra_tls_hosts=[str(h) for h in entry.get("extra_tls_hosts") or []],
         labels={str(k): str(v) for k, v in (entry.get("labels") or {}).items()},
         fleet=str(entry.get("fleet") or ""),
+        console_url=str(entry.get("console_url") or ""),
         integrity_determinism=bool(integ.get("determinism", True)),
         integrity_double_protect=bool(integ.get("double_protect", True)),
         integrity_format_isolation=bool(integ.get("format_isolation", True)),
@@ -249,4 +253,6 @@ def load(path: str | Path) -> Config:
         support_end={str(k): v for k, v in (ex.get("support_end") or {}).items()},
         coverage=cov,
         sdm=raw.get("sdm") or None,
+        identity_activity=raw.get("identity_activity") or None,
+        restore_drills=raw.get("restore_drills") or None,
     )
