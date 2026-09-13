@@ -5,6 +5,21 @@ exporter:
   port: 9743
   interval_seconds: 30       # every probe runs this often; each tokenize probe = 2 WS calls
 
+# Optional: Structured Data Manager checks -- masked non-prod data and job history. See docs/SDM.md.
+# sdm:
+#   masking:
+#     - name: nonprod-cards-pan
+#       kind: leak                                   # leak | consistency | constant
+#       source: {type: sql, driver: psycopg, dsn: "postgresql://ro@nonprod-db/cards", password_env: NONPROD_DB_PASSWORD}
+#       query: "SELECT pan FROM customers"
+#       canary_file: /etc/voltage-exporter/canaries.sha256
+#       canaries_hashed: true
+#   jobs:
+#     - name: sdm
+#       source: {type: file, path: /exports/sdm-jobs.csv}
+#       columns: [job_name, status, finished_at, rows]
+#       expect_every: 24h
+
 # Optional: join a classification feed (from SDM, Core Data Discovery, or a spreadsheet)
 # with your data map and the live policy. See docs/COVERAGE.md.
 # coverage:

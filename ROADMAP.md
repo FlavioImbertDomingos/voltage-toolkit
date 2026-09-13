@@ -24,8 +24,10 @@ data only, no production values.
 | R5 eFPE awareness | ✅ shipped — detection in `feat: policy intelligence`, determinism exclusion in `feat: silent-corruption probes` |
 | R6 coverage metrics | ✅ shipped — `feat: coverage` |
 | R7 data map | ✅ shipped — `feat: coverage` |
-| R8–R9 masking probes / batch jobs | next |
-| R10–R11, R13–R14, R16 | planned |
+| R8 masking-quality probes | ✅ shipped — `feat: sdm checks` |
+| R9 batch-job exporter | ✅ shipped — `feat: sdm checks` (inside voltage-exporter, not a sibling repo) |
+| R16 console reachability | next |
+| R10–R11, R13–R14 | planned |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
 | R15 cross-region token equivalence | ✅ shipped — `feat: fleet agreement` |
 
@@ -137,7 +139,7 @@ data map: column → format → district → consuming identity. Then `voltage_p
 both directions — a format defined in policy that nothing consumes (a dead format whose keys
 still rotate), and a classified column the map never declared.
 
-### R8. Masking-quality probes for test data · **M**
+### R8. Masking-quality probes for test data · **M** · ✅ shipped
 
 SDM's test-data masking fails in two specific, checkable ways: output that still looks live
 (passes Luhn, or matches a real-PAN pattern), and broken referential integrity — the same input
@@ -147,7 +149,7 @@ the irreversible primitive here, and irreversibility is itself testable.
 Ship: `sdm_mask_leak_detected`, `sdm_mask_consistency_ok`, `sdm_fph_irreversible_ok`, run
 against a non-prod schema. Small to build, instantly legible to an auditor.
 
-### R9. Batch-job exporter for archive / masking runs · **M**
+### R9. Batch-job exporter for archive / masking runs · **M** · ✅ shipped
 
 Archive, retention and masking runs are batch. They fail quietly; the first symptom is a
 storage bill or a retention violation. `sdm_job_last_success_timestamp_seconds`,

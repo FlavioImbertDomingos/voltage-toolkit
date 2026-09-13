@@ -3,6 +3,29 @@ exporter:
   port: 9743
   interval_seconds: 15
 
+# Structured Data Manager: masked data quality and batch jobs (see docs/SDM.md).
+# The non-prod database is seeded by the nonprod-seed service in docker-compose.
+sdm:
+  masking:
+    - name: nonprod-pan-leak
+      kind: leak
+      source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+      query: "SELECT pan FROM customers"
+      canary_file: /config/canaries.txt
+    - name: nonprod-pan-ri
+      kind: consistency
+      source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+      query: "SELECT c.customer_id, c.pan, o.pan FROM customers c JOIN orders o USING (customer_id)"
+    - name: nonprod-ssn-constant
+      kind: constant
+      source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+      query: "SELECT ssn FROM customers"
+  jobs:
+    - name: sdm
+      source: {type: sql, dsn: "sqlite:////data/nonprod.db"}
+      query: "SELECT job_name, status, finished_at, rows_processed FROM sdm_job_history"
+      expect_every: 24h
+
 # Is every classified sensitive column actually protected? (see docs/COVERAGE.md)
 coverage:
   classification_csv: /config/classification.csv

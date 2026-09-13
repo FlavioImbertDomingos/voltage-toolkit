@@ -9,7 +9,7 @@ route:
   repeat_interval: 4h
   routes:
     # Data-integrity and outage alerts page immediately.
-    - matchers: ['alertname =~ "VoltageRoundTripMismatch|VoltageFormatIsolationBroken|VoltageNonDeterministic|VoltageRegionDivergence|VoltageTokenizationFailing|VoltagePolicyUnreachable"']
+    - matchers: ['alertname =~ "VoltageRoundTripMismatch|VoltageFormatIsolationBroken|VoltageNonDeterministic|VoltageRegionDivergence|SDMMaskLeak|VoltageTokenizationFailing|VoltagePolicyUnreachable"']
       receiver: pager
       group_wait: 0s
       repeat_interval: 30m

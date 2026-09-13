@@ -22,6 +22,9 @@
 #      curl -X POST localhost:8801/mock/scenario/diverged-keys   # same policy, different tokens -> pages
 #      curl -X POST localhost:8801/mock/scenario/key-rotated     # rotation reached DR only
 #      curl -X POST localhost:8801/mock/scenario/healthy
+#
+#  A pretend masked non-prod database (nonprod-seed) feeds the SDM checks: one planted
+#  canary survives masking, one masking job is stale and failing. docs/SDM.md
 # ------------------------------------------------------------------
 
 services:
@@ -68,6 +71,16 @@ services:
       timeout: 3s
       retries: 20
 
+  # A pretend *masked* non-production database + SDM job history, for the R8/R9 checks.
+  # Seeded once into a shared volume; the exporter reads it read-only.
+  nonprod-seed:
+    image: python:3.12-slim
+    container_name: nonprod-seed
+    volumes:
+      - ./demo:/demo:ro
+      - nonprod-data:/data
+    command: ["python", "/demo/seed_nonprod.py", "/data/nonprod.db"]
+
   voltage-exporter:
     build: ./exporter
     image: voltage-toolkit/voltage-exporter:latest
@@ -81,6 +94,8 @@ services:
       - ./config/voltage-exporter.demo.yml:/config/voltage-exporter.yml:ro
       - ./config/classification.demo.csv:/config/classification.csv:ro
       - ./config/voltage-data-map.demo.yml:/config/voltage-data-map.yml:ro
+      - ./demo/canaries.txt:/config/canaries.txt:ro
+      - nonprod-data:/data:ro
     ports:
       - "9743:9743"
     depends_on:
@@ -88,6 +103,8 @@ services:
         condition: service_healthy
       voltage-dr:
         condition: service_healthy
+      nonprod-seed:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   prometheus:
@@ -123,3 +140,6 @@ services:
     ports:
       - "3000:3000"
     depends_on: [prometheus]
+
+volumes:
+  nonprod-data:

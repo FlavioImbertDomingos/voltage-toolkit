@@ -57,7 +57,7 @@
   <!-- prometheus stack -->
   <rect x="930" y="120" width="320" height="150" rx="10" fill="#eef2f7" stroke="#8fa3b8" stroke-width="2.5"/>
   <text x="1090" y="156" text-anchor="middle" class="h2">Prometheus</text>
-  <text x="1090" y="182" text-anchor="middle" class="s">31 alert rules, promtool-tested</text>
+  <text x="1090" y="182" text-anchor="middle" class="s">37 alert rules, promtool-tested</text>
   <text x="1090" y="204" text-anchor="middle" class="s">recording rules for p95, error ratio,</text>
   <text x="1090" y="224" text-anchor="middle" class="s">days-to-expiry, days-of-support</text>
   <text x="1090" y="254" text-anchor="middle" class="cap">→ Alertmanager (routing, inhibition) → Grafana</text>

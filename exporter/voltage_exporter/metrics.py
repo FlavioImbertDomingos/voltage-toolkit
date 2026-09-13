@@ -23,6 +23,7 @@ from .fleet import evaluate as evaluate_fleet
 from .lifecycle import split_version, support_end
 from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
 from .probes import TargetResult, run_target
+from .sdm import JobResult, MaskResult
 
 log = logging.getLogger(__name__)
 NS = "voltage"
@@ -143,6 +144,28 @@ coverage_unclassified_mappings = Gauge(
 coverage_feed_mtime = Gauge(f"{NS}_coverage_feed_mtime_seconds", "Modification time of the classification feed")
 coverage_errors = Gauge(f"{NS}_coverage_errors", "Parse/consistency errors in the feed or data map")
 coverage_ok = Gauge(f"{NS}_coverage_up", "1 if the feed and data map were read and evaluated")
+
+# ---- SDM: masking quality (R8) and batch jobs (R9)
+sdm_mask_ok = Gauge(
+    f"{NS}_sdm_mask_ok", "1 if the masking check passed (kind = leak | consistency | constant)", ["check", "kind"]
+)
+sdm_mask_rows = Gauge(f"{NS}_sdm_mask_rows", "Rows the masking check examined", ["check", "kind"])
+sdm_mask_hits = Gauge(
+    f"{NS}_sdm_mask_hits",
+    "leak: canary / looks-live matches; consistency: inconsistently masked keys; constant: 1 if all identical",
+    ["check", "kind"],
+)
+sdm_check_up = Gauge(f"{NS}_sdm_check_up", "1 if the check's source could be read and evaluated", ["check", "kind"])
+sdm_job_last_success = Gauge(
+    f"{NS}_sdm_job_last_success_timestamp_seconds", "Last successful finish of the job", ["check", "job"]
+)
+sdm_job_last_finished = Gauge(
+    f"{NS}_sdm_job_last_finished_timestamp_seconds", "Most recent finish, any status", ["check", "job"]
+)
+sdm_job_status = Gauge(f"{NS}_sdm_job_last_status", "Most recent status (always 1)", ["check", "job", "status"])
+sdm_job_rows = Gauge(f"{NS}_sdm_job_last_rows", "Rows processed by the most recent run", ["check", "job"])
+sdm_job_stale = Gauge(f"{NS}_sdm_job_stale", "1 if the job has not succeeded within expect_every", ["check", "job"])
+sdm_job_failing = Gauge(f"{NS}_sdm_job_failing", "1 if the job's most recent run failed", ["check", "job"])
 
 # ---- tls / key servers
 cert_expiry = Gauge(f"{NS}_certificate_expiry_timestamp_seconds", "Certificate notAfter", ["target", "host", "subject"])
@@ -314,6 +337,39 @@ def apply_coverage(report: CoverageReport | None, feed_mtime: float | None, max_
         log.warning("coverage: %s", e)
 
 
+def apply_sdm(masks: list[MaskResult], jobs: list[JobResult]) -> None:
+    for m in masks:
+        c, k = m.check.name, m.check.kind
+        sdm_check_up.labels(c, k).set(0.0 if m.ok is None else 1.0)
+        if m.ok is None:
+            log.warning("[sdm %s] %s: %s", c, k, m.detail)
+            continue
+        sdm_mask_ok.labels(c, k).set(1.0 if m.ok else 0.0)
+        sdm_mask_rows.labels(c, k).set(float(m.rows))
+        sdm_mask_hits.labels(c, k).set(float(m.hits))
+        if not m.ok:
+            log.error("[sdm %s] MASKING %s: %s", c, k, m.detail)
+    for j in jobs:
+        c = j.check.name
+        sdm_check_up.labels(c, "jobs").set(0.0 if j.ok is None else 1.0)
+        if j.ok is None:
+            log.warning("[sdm %s] jobs: %s", c, j.detail)
+            continue
+        sdm_job_status.clear()
+        for js in j.jobs:
+            if js.finished_at is not None:
+                sdm_job_last_finished.labels(c, js.job).set(js.finished_at)
+            if js.job in j.last_success:
+                sdm_job_last_success.labels(c, js.job).set(j.last_success[js.job])
+            sdm_job_status.labels(c, js.job, js.status).set(1.0)
+            if js.rows is not None:
+                sdm_job_rows.labels(c, js.job).set(js.rows)
+            sdm_job_stale.labels(c, js.job).set(1.0 if js.job in j.stale else 0.0)
+            sdm_job_failing.labels(c, js.job).set(1.0 if js.job in j.failing else 0.0)
+        if not j.ok:
+            log.error("[sdm %s] JOBS: %s", c, j.detail)
+
+
 def probe_loop(config: Config, stop: threading.Event) -> None:
     configure(config)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(config.targets)))) as pool:
@@ -328,6 +384,11 @@ def probe_loop(config: Config, stop: threading.Event) -> None:
 
                 rep, mtime = run_coverage(config.coverage, results)
                 apply_coverage(rep, mtime, config.coverage.max_named_columns)
+            if config.sdm:
+                from .sdm import parse_config, run_job_check, run_mask_check
+
+                sc = parse_config(config.sdm)
+                apply_sdm([run_mask_check(m) for m in sc.masking], [run_job_check(j) for j in sc.jobs])
             cycles.inc()
             elapsed = time.perf_counter() - started
             log.info("probe cycle done in %.2fs (%d target(s))", elapsed, len(config.targets))

@@ -26,8 +26,8 @@ jobs:
           pip install ruff
           pip install -e "./exporter[test]"
       - run: |
-          ruff check exporter mock-voltage grafana
-          ruff format --check exporter mock-voltage grafana
+          ruff check exporter mock-voltage grafana demo
+          ruff format --check exporter mock-voltage grafana demo
       - run: cd exporter && python -m pytest -q
       - name: policy.py and coverage.py are identical in exporter and collection
         run: |
@@ -107,6 +107,13 @@ jobs:
           echo "$M" | grep -q '^voltage_coverage_up 1.0'
           echo "$M" | grep -q 'voltage_coverage_columns{classification="PAN",state="unmapped"} 1.0'
           echo "$M" | grep -q 'voltage_coverage_column_info{.*column="card_no".*state="unmapped"'
+      - name: SDM checks from the seeded non-prod db
+        run: |
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q 'voltage_sdm_mask_ok{check="nonprod-pan-leak",kind="leak"} 0.0'
+          echo "$M" | grep -q 'voltage_sdm_mask_ok{check="nonprod-pan-ri",kind="consistency"} 1.0'
+          echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="mask-nonprod-refresh"} 1.0'
+          echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="archive-orders-2019"} 0.0'
       - name: Fleet agrees, then DR diverges
         run: |
           M=$(curl -sf http://localhost:9743/metrics)

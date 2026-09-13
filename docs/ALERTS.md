@@ -24,6 +24,12 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageDeadFormat` | format offered, used by nothing | 24h | info | Retire it or map what uses it |
 | `VoltageClassificationFeedStale` | feed older than 7 days | — | warning | Coverage is only as current as discovery |
 | `VoltageCoverageInputsUnreadable` | `voltage_coverage_up == 0` | 15m | warning | Missing/invalid feed or data map; see exporter logs |
+| `SDMMaskLeak` | a canary (or live-looking value) in masked data | — | critical | **Non-prod holds production data.** Re-mask before anyone gets the environment |
+| `SDMMaskInconsistent` | same key masks differently across tables | 30m | warning | Joins in the test environment silently drop rows; re-mask the tables together |
+| `SDMMaskConstant` | every masked value identical | 30m | warning | A fill-with-X job; the column is useless for testing |
+| `SDMJobStale` | no success within `expect_every` | 1h | warning | Archive / retention / masking runs fail quietly |
+| `SDMJobFailing` | latest run failed | — | warning | Check the job's own log |
+| `SDMSourceUnreadable` | check cannot read its source | 15m | warning | DB / credentials / query / export file |
 | `VoltageErrorRateHigh` | > 5 % failures over 10m | 5m | warning | Intermittent errors apps are retrying around |
 | `VoltageLatencyHigh` | p95 protect > 500 ms | 5m | warning | Appliance load, key server, network path, key rotation in progress |
 | `VoltageFormatNotPreserved` | token shape ≠ sample shape | 2m | warning | Wrong format bound to the identity, or a tokenization format used where FPE expected |
@@ -38,7 +44,7 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 | `VoltageVersionOutOfSupport` | maintenance ended | — | critical | No security fixes; PCI DSS 6.3.3 finding |
 
 Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / format-isolation /
-non-determinism / region-divergence / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
+non-determinism / region-divergence / masking-leak / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
 tokenize alerts; tokenize-failing silences error-rate/latency/auth for the same format).
 
 Thresholds are in the rule expressions — edit, then `promtool test rules` and

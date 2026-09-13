@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **SDM checks** (roadmap R8, R9): masking quality (`leak` via planted canaries — heuristic off by default and
+  documented why — `consistency`, `constant`) and job health (stale / failing per job) read from masked non-prod data
+  and job history through one read-only source adapter (`sources.py`: SQL via any DB-API driver incl. stdlib sqlite,
+  or CSV). `voltage_sdm_*` metrics; alerts `SDMMaskLeak` (critical, pages), `SDMMaskInconsistent`, `SDMMaskConstant`,
+  `SDMJobStale`, `SDMJobFailing`, `SDMSourceUnreadable`. Compose seeds a pretend masked database (`demo/seed_nonprod.py`)
+  with one leaked canary and one stale, failing job. `docs/SDM.md`.
 - **Coverage** (roadmap R6, R7): classification feed (CSV) × `voltage-data-map.yml` × live policy → every classified
   column is protected / unmapped / broken / unknown; dead formats the other way. Shared stdlib `coverage.py` (exporter +
   `module_utils`, CI-diffed). Exporter: `coverage:` config, `voltage_coverage_*` metrics, alerts

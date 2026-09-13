@@ -1,0 +1,4 @@
+# Canary values planted in "production": synthetic, unique, must never appear in masked data.
+# One value per line. Compare-by-hash is also supported (canaries_hashed: true).
+4539780012345678
+4539991122334455

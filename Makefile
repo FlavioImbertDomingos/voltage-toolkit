@@ -27,8 +27,8 @@ test-collection: ## Ansible collection unit tests
 	python -m pytest -q ansible_collections/flavioimbertdomingos/voltage/tests/unit -p no:cacheprovider
 
 lint: ## ruff
-	ruff check exporter mock-voltage grafana
-	ruff format --check exporter mock-voltage grafana
+	ruff check exporter mock-voltage grafana demo
+	ruff format --check exporter mock-voltage grafana demo
 
 build: ## Build images
 	docker compose build
