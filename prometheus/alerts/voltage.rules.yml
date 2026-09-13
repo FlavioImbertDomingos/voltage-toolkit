@@ -8,10 +8,14 @@ groups:
     interval: 15s
     rules:
       - record: voltage:tokenize_error_ratio_10m
+        # "or 0 * total" keeps the ratio at 0 (not absent) for targets that have never failed
         expr: |
-          sum by (target, format) (rate(voltage_tokenize_probes_total{result="failure"}[10m]))
+          (
+            sum by (target, format) (rate(voltage_tokenize_probes_total{result="failure"}[10m]))
+              or 0 * sum by (target, format) (rate(voltage_tokenize_probes_total[10m]))
+          )
             /
-          sum by (target, format) (rate(voltage_tokenize_probes_total[10m]))
+          sum by (target, format) (rate(voltage_tokenize_probes_total[10m]) > 0)
       - record: voltage:protect_p95_seconds_10m
         expr: histogram_quantile(0.95, sum by (target, format, le) (rate(voltage_protect_seconds_bucket[10m])))
       - record: voltage:access_p95_seconds_10m

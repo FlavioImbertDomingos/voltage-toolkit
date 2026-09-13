@@ -43,8 +43,8 @@ encrypts 5 digits — 10^5, *under* it. The appliance will encrypt both without 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
 | `voltage_tokenize_success` | gauge | `format`, `identity` | 1 if the last round-trip succeeded |
-| `voltage_tokenize_probes_total` | counter | `format`, `result` (success / failure) | Round-trips run |
-| `voltage_tokenize_errors_total` | counter | `format`, `kind` (auth / http / timeout / connection / mismatch / other) | Failures by cause |
+| `voltage_tokenize_probes_total` | counter | `format`, `result` (success / failure) | Round-trips run. Both `result` series exist from the first cycle (the failure one at 0), so ratios are 0 rather than absent on a healthy target |
+| `voltage_tokenize_errors_total` | counter | `format`, `kind` (auth / http / timeout / connection / mismatch / other) | Failures by cause; every kind is pre-created at 0 |
 | `voltage_protect_seconds` | histogram | `format` | protect latency (buckets 10 ms – 10 s) |
 | `voltage_access_seconds` | histogram | `format` | access latency |
 | `voltage_protect_last_seconds` / `voltage_access_last_seconds` | gauge | `format` | Last observed latency |

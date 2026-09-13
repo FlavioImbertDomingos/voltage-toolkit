@@ -158,6 +158,20 @@ def test_metrics_apply_and_policy_change_counter(mock_server):
     assert 'voltage_certificate_expiry_timestamp_seconds{host="127.0.0.1' in text
 
 
+def test_healthy_target_still_exposes_zero_failure_series(mock_server):
+    """rate(failure)/rate(total) must be 0, not absent, on a stack that never failed --
+    otherwise the error-rate panels show 'No data' until the first outage."""
+    from prometheus_client import generate_latest
+
+    t = target_for(mock_server, name="zero")
+    metrics.apply(run_target(t))
+    text = generate_latest().decode()
+    assert 'voltage_tokenize_probes_total{format="CC",result="failure",target="zero"} 0.0' in text
+    assert 'voltage_tokenize_probes_total{format="CC",result="success",target="zero"} 1.0' in text
+    for kind in metrics.ERROR_KINDS:
+        assert f'voltage_tokenize_errors_total{{format="CC",kind="{kind}",target="zero"}} 0.0' in text
+
+
 def test_client_certificate_helper(mock_server):
     _, https, _ = mock_server
     host, port = host_port(https)

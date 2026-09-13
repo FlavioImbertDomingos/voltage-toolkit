@@ -336,3 +336,31 @@ tests:
             exp_annotations:
               summary: "SDM check pan-leak (leak) cannot read its source"
               description: "Database unreachable, credentials rejected, query invalid, or export file missing. The check's other metrics are stale until fixed; see exporter logs."
+
+  # error ratio: 0 (not absent) on a target that has never failed; real ratio once it does
+  - interval: 15s
+    input_series:
+      - series: 'voltage_tokenize_probes_total{target="prod", format="CC", result="success"}'
+        values: "0+1x120"
+      - series: 'voltage_tokenize_probes_total{target="prod", format="CC", result="failure"}'
+        values: "0x40 0+1x80"
+      - series: 'voltage_tokenize_probes_total{target="dr", format="CC", result="success"}'
+        values: "0+1x120"
+    promql_expr_test:
+      - expr: voltage:tokenize_error_ratio_10m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'voltage:tokenize_error_ratio_10m{target="prod", format="CC"}'
+            value: 0
+          - labels: 'voltage:tokenize_error_ratio_10m{target="dr", format="CC"}'
+            value: 0
+      - expr: voltage:tokenize_error_ratio_10m{target="dr"}
+        eval_time: 20m
+        exp_samples:
+          - labels: 'voltage:tokenize_error_ratio_10m{target="dr", format="CC"}'
+            value: 0
+      - expr: voltage:tokenize_error_ratio_10m{target="prod"} > 0.4
+        eval_time: 25m
+        exp_samples:
+          - labels: 'voltage:tokenize_error_ratio_10m{target="prod", format="CC"}'
+            value: 0.5
