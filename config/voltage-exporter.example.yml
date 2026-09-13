@@ -4,6 +4,8 @@
 exporter:
   port: 9743
   interval_seconds: 30       # every probe runs this often; each tokenize probe = 2 WS calls
+  log_level: INFO
+  log_format: text           # json = one event per target per cycle, for Splunk & co. (docs/INTEGRATIONS.md)
 
 # Optional: Structured Data Manager checks -- masked non-prod data and job history. See docs/SDM.md.
 # sdm:

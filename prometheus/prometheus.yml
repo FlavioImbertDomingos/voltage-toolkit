@@ -14,3 +14,15 @@ scrape_configs:
   - job_name: voltage-exporter
     static_configs:
       - targets: ["voltage-exporter:9743"]
+
+# Ship the metrics themselves to Splunk as well (roadmap R17, docs/INTEGRATIONS.md). Grafana keeps
+# reading this Prometheus; Splunk gets a copy for long retention and correlation.
+# remote_write:
+#   - url: https://splunk.example.bank:8088/services/collector/metrics
+#     authorization:
+#       type: Splunk
+#       credentials_file: /etc/prometheus/secrets/splunk.token
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: "voltage(:|_).*"
+#         action: keep

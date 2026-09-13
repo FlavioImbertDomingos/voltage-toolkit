@@ -847,3 +847,30 @@ def test_sdm_config_loads(tmp_path):
         "targets:\n  - {name: a, policy_url: https://x/policy/clientPolicy.xml, identity: i, auth: {secret: s}}\n"
     )
     assert config.load(cfg).sdm["masking"][0]["name"] == "x"
+
+
+def test_structured_event_and_json_logging(mock_server, capsys):
+    """One JSON object per target per cycle, no token or secret in it."""
+    import json
+    import logging
+
+    from voltage_exporter.structured import EVENT_ATTR, configure_logging, summary_line, target_event
+
+    t = target_for(mock_server, name="siem")
+    r = run_target(t)
+    ev = target_event(r)
+    assert ev["event"] == "probe" and ev["target"] == "siem" and ev["policy_ok"] is True
+    assert ev["probes_ok"] == ev["probes_total"] >= 1
+    assert ev["keyservers_up"] == ev["keyservers_total"] >= 1
+    assert ev["probes"][0]["format"] == "CC" and ev["probes"][0]["roundtrip_ok"] is True
+    serialised = json.dumps(ev)
+    assert t.secret not in serialised and "4111" not in serialised  # no sample, no secret
+    assert summary_line(ev).startswith("[siem] policy ok probes ")
+
+    configure_logging("INFO", "json")
+    logging.getLogger("voltage_exporter.test").info(summary_line(ev), extra={EVENT_ATTR: ev})
+    line = capsys.readouterr().err.strip().splitlines()[-1]
+    obj = json.loads(line)
+    assert obj["event"] == "probe" and obj["target"] == "siem" and obj["level"] == "INFO"
+    assert obj["ts"].endswith("Z") and obj["message"].startswith("[siem]")
+    configure_logging("INFO", "text")

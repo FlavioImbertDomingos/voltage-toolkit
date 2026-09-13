@@ -94,6 +94,14 @@ public, which is why the parser stays forgiving.
 release notes give end-of-maintenance dates. `lifecycle.py` holds the public ones and merges
 `exporter.support_end` from config, longest version prefix first.
 
+**Why structured logs next to metrics:** Prometheus is a ring buffer of numbers; a SIEM keeps a
+year of context. `structured.py` builds one dict per target per cycle from the same
+`TargetResult` the metrics come from, and `JsonFormatter` writes it as a single line with the
+logger's message alongside — so `log_format: text` shows a readable summary and `json` shows the
+same facts for a forwarder. Vendor delivery (PagerDuty, Splunk) lives entirely in Alertmanager
+receivers and the log pipeline; nothing in the exporter knows a vendor name
+(`docs/INTEGRATIONS.md`).
+
 ## Collection
 
 ```
@@ -118,6 +126,10 @@ The exporter's tests cover the parser; a CI step checks the two files are identi
 protect/access, a key server path) with a toy shape-preserving substitution and runtime
 scenarios. It is a demo/test fixture, not an emulator — it exists so the pipeline can be
 built and tested without a licence.
+
+`mock-integrations/app.py` does the same for the delivery side: a stdlib server that validates
+PagerDuty Events v2 and Splunk HEC requests the way the real endpoints do and records them, so
+"the alert reached the pager" is a CI assertion rather than a belief.
 
 ## Adding a probe kind
 

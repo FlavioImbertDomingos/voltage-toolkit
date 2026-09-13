@@ -98,6 +98,7 @@ docker compose up -d
 | The mock appliance's policy | https://localhost:8443/policy/clientPolicy.xml |
 | Masked non-prod database (sqlite, read-only) | seeded by `nonprod-seed` into the `nonprod-data` volume |
 | The second region (same district) | https://localhost:8444/policy/clientPolicy.xml · scenarios on :8801 |
+| What PagerDuty and Splunk received (mock) | http://localhost:8900/received?kind=pagerduty · `?kind=splunk` |
 
 ### Break it on purpose
 
@@ -177,6 +178,11 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 
 **Ansible:** see the [collection README](ansible_collections/flavioimbertdomingos/voltage/README.md).
 
+**PagerDuty and Splunk:** Alertmanager already routes to both (keys read from files); the exporter
+logs one JSON event per target per cycle for the SIEM, and `splunk/` is an installable Splunk app
+with the dashboard and scheduled searches. Grafana and Alertmanager stay as they are.
+See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+
 ---
 
 ## What you get
@@ -204,7 +210,8 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 | Are we running out of support? | `voltage_appliance_version_info`, `voltage_support_end_timestamp_seconds` | The version is in the policy file; the dates are in the release notes |
 
 37 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
-routing with inhibition, a Grafana dashboard.
+routing with inhibition and receivers for PagerDuty and Splunk, a Grafana dashboard, and JSON
+probe events for a SIEM.
 
 ---
 
@@ -215,6 +222,7 @@ voltage-toolkit/
 ├── docker-compose.yml                  one command → mock + exporter + Prometheus + Alertmanager + Grafana
 ├── exporter/                           voltage-exporter (Python; pip-installable; Dockerfile; tests)
 ├── mock-voltage/                       pretend appliance: clientPolicy.xml, REST + SOAP WS API, key server, scenarios
+├── mock-integrations/                  pretend PagerDuty Events v2 + Splunk HEC: records what Alertmanager delivered
 ├── ansible_collections/flavioimbertdomingos/voltage/
 │   ├── plugins/modules/                voltage_policy_facts, voltage_probe, voltage_district, voltage_identity, voltage_auth_method
 │   ├── plugins/module_utils/           policy parser (shared with the exporter), WS client, desired-state backends
@@ -223,9 +231,10 @@ voltage-toolkit/
 │   ├── docs/ADAPTER.md                 the http / command adapter contract
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
 ├── prometheus/                         config + 37 alert rules + promtool tests
-├── alertmanager/ · grafana/            routing, inhibition, generated dashboard
+├── alertmanager/ · grafana/            routing, inhibition, PagerDuty + Splunk receivers (secrets/ = demo keys), generated dashboard
+├── splunk/voltage_toolkit/             installable Splunk app: props, macros, scheduled searches, the SIEM dashboard
 ├── demo/                               seed_nonprod.py + canaries.txt: the pretend masked non-prod database
-└── docs/                               METRICS, ALERTS, COVERAGE, SDM, REAL-VOLTAGE, ARCHITECTURE, FAQ
+└── docs/                               METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```
 
 ## Status & honesty

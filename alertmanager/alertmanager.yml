@@ -1,3 +1,19 @@
+# Alertmanager: routing, inhibition, and the enterprise receivers (roadmap R17).
+#
+# Three receivers, three jobs:
+#   splunk   every alert, firing and resolved, as an audit trail (HTTP Event Collector, raw endpoint)
+#   pager    the ones that wake someone up (PagerDuty Events API v2)
+#   default  everything else (wire Slack / email here)
+#
+# Secrets are read from files, never written in this document:
+#   /etc/alertmanager/secrets/pagerduty.key   PagerDuty Events v2 integration key (32 chars)
+#   /etc/alertmanager/secrets/splunk.token    Splunk HEC token
+#   /etc/alertmanager/secrets/splunk.url      https://<splunk-host>:8088/services/collector/raw?sourcetype=alertmanager
+#
+# docker compose mounts ./alertmanager/secrets/ with demo values that point at the integrations
+# mock (mock-integrations/), so the stack works end to end without accounts. For real use, replace
+# the three files and delete the two `url:` overrides marked DEMO below.
+
 global:
   resolve_timeout: 5m
 
@@ -8,6 +24,13 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # Audit trail: every alert also goes to Splunk, then routing continues below.
+    - matchers: ['alertname =~ ".+"']
+      receiver: splunk
+      continue: true
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 12h
     # Data-integrity and outage alerts page immediately.
     - matchers: ['alertname =~ "VoltageRoundTripMismatch|VoltageFormatIsolationBroken|VoltageNonDeterministic|VoltageRegionDivergence|SDMMaskLeak|VoltageTokenizationFailing|VoltagePolicyUnreachable"']
       receiver: pager
@@ -18,14 +41,40 @@ route:
 
 receivers:
   - name: default
-  - name: pager
     # slack_configs:
-    #   - api_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+    #   - api_url_file: /etc/alertmanager/secrets/slack.url
     #     channel: "#tokenization-alerts"
     #     title: '{{ .CommonAnnotations.summary }}'
     #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ "\n" }}{{ end }}'
-    # pagerduty_configs:
-    #   - routing_key: <key>
+
+  - name: pager
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/secrets/pagerduty.key
+        url: http://mock-integrations:8900/v2/enqueue   # DEMO: delete this line for real PagerDuty
+        send_resolved: true
+        severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}warning{{ end }}'
+        description: '{{ .CommonAnnotations.summary }}'
+        client: voltage-toolkit alertmanager
+        client_url: http://localhost:9093
+        component: '{{ .CommonLabels.target }}'
+        group: '{{ .CommonLabels.fleet }}'
+        class: '{{ .CommonLabels.alertname }}'
+        details:
+          target: '{{ .CommonLabels.target }}'
+          format: '{{ .CommonLabels.format }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook: 'https://github.com/FlavioImbertDomingos/voltage-toolkit/blob/main/docs/ALERTS.md'
+          firing: '{{ .Alerts.Firing | len }}'
+
+  - name: splunk
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/splunk.url
+        send_resolved: true
+        max_alerts: 0
+        http_config:
+          authorization:
+            type: Splunk
+            credentials_file: /etc/alertmanager/secrets/splunk.token
 
 inhibit_rules:
   # If the policy server is down, every tokenize probe fails too -- one page, not six.

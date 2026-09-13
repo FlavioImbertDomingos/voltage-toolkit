@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+- **Enterprise integrations** (roadmap R17): Alertmanager receivers for PagerDuty (Events API v2, `routing_key_file`,
+  severity/class/component from labels, auto-resolve) and Splunk (HEC raw endpoint via `webhook_configs` with
+  `url_file` + `credentials_file`, fed by a `continue: true` route so every firing and resolution is archived).
+  Exporter `log_format: json` / `VOLTAGE_EXPORTER_LOG_FORMAT` / `--log-format`: one structured event per target per
+  cycle (`structured.py`), hashes and booleans only. `mock-integrations/` (stdlib) impersonates both APIs so the
+  compose stack and CI prove delivery without accounts; `alertmanager/secrets/` holds demo keys;
+  `docker-compose.override.example.yml` shows the production mount and the Docker `splunk` log driver; commented
+  `remote_write` in `prometheus.yml`. `amtool check-config` in CI. `docs/INTEGRATIONS.md`.
+- **Splunk app** `splunk/voltage_toolkit/`: `props.conf` for the `voltage-exporter` and `alertmanager` sourcetypes,
+  macros, three scheduled searches (policy changed outside a window, exporter silent, masking-leak time to clear) and
+  the `voltage_tokenization` Simple XML dashboard (right now / history / change / alert audit). `splunk/README.md`.
+
 ### Fixed
 - Grafana: table panels (formats, certificates, key tables, domain sizes, fleet, coverage, SDM) rendered a raw
   label-set string with a frame picker instead of rows — the instant queries lacked `format: table`. All tables now
