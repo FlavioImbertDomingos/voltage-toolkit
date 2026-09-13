@@ -1,0 +1,291 @@
+<form version="1.1" theme="light">
+  <label>Voltage Tokenization</label>
+  <description>Can applications tokenize, is the data coming back right, what changed and when, and how long did every alert stay open. Fed by voltage-exporter JSON events and Alertmanager webhooks.</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="tr" searchWhenChanged="true">
+      <label>Time range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="target" searchWhenChanged="true">
+      <label>Target</label>
+      <choice value="*">All targets</choice>
+      <default>*</default>
+      <fieldForLabel>target</fieldForLabel>
+      <fieldForValue>target</fieldForValue>
+      <search>
+        <query>`voltage_probe_events` | stats count BY target</query>
+        <earliest>-7d@d</earliest>
+        <latest>now</latest>
+      </search>
+    </input>
+  </fieldset>
+
+  <!-- ================================================================ right now -->
+  <row>
+    <panel>
+      <title>Targets with policy reachable</title>
+      <single>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| stats latest(policy_ok) AS policy_ok BY target
+| stats sum(eval(if(policy_ok="true",1,0))) AS up count AS total
+| eval value=if(total>0, round(100*up/total), 0)
+| fields value</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="field">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0xdc4e41","0x53a051"]</option>
+        <option name="rangeValues">[99]</option>
+        <option name="useColors">1</option>
+        <option name="unit">%</option>
+        <option name="underLabel">of targets: policy host answering</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Targets tokenizing fully</title>
+      <single>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| stats latest(probes_ok) AS ok latest(probes_total) AS total BY target
+| stats sum(eval(if(ok=total,1,0))) AS healthy count AS targets
+| eval value=if(targets>0, round(100*healthy/targets), 0)
+| fields value</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="field">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0xdc4e41","0x53a051"]</option>
+        <option name="rangeValues">[99]</option>
+        <option name="useColors">1</option>
+        <option name="unit">%</option>
+        <option name="underLabel">of targets: every probed format round-trips</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Data-integrity failures</title>
+      <single>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| stats latest(integrity_ok) AS integrity_ok BY target
+| stats sum(eval(if(integrity_ok="false",1,0))) AS failing</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="underLabel">determinism · double-protect · format isolation</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Nearest certificate expiry</title>
+      <single>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| stats latest(tls_min_days) AS days BY target
+| stats min(days) AS days
+| eval days=round(days,0)</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0xdc4e41","0xf8be34","0x53a051"]</option>
+        <option name="rangeValues">[7,30]</option>
+        <option name="useColors">1</option>
+        <option name="unit">days</option>
+        <option name="underLabel">policy host, WS host, key servers</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Alerts open now</title>
+      <single>
+        <search>
+          <query>`voltage_alerts`
+| stats latest(status) AS status BY alertname target
+| where status="firing"
+| stats count</query>
+          <earliest>-7d@d</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,2]</option>
+        <option name="useColors">1</option>
+        <option name="underLabel">last notification per alert was "firing"</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ================================================================ history -->
+  <row>
+    <panel>
+      <title>Probe failures per 5 minutes, by target</title>
+      <chart>
+        <search>
+          <query>`voltage_probes_expanded` target=$target$
+| timechart span=5m count(eval(ok="false")) AS failed BY target</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.axisTitleY.text">failed probes</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>protect() latency p95 by format (ms)</title>
+      <chart>
+        <search>
+          <query>`voltage_probes_expanded` target=$target$ ok="true"
+| timechart span=5m perc95(protect_ms) BY format</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.axisTitleY.text">ms</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Why probes failed</title>
+      <chart>
+        <search>
+          <query>`voltage_probes_expanded` target=$target$ ok="false"
+| timechart span=15m count BY error_kind</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.fieldColors">{"auth":0xdc4e41,"timeout":0xf8be34,"connection":0xf1813f,"http":0x6a5c9e,"mismatch":0x000000,"other":0x9aa5b1}</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ================================================================ change -->
+  <row>
+    <panel>
+      <title>Policy changes (clientPolicy.xml hash transitions)</title>
+      <table>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| sort 0 _time
+| streamstats current=f last(policy_sha256) AS previous BY target
+| where isnotnull(previous) AND policy_sha256!=previous
+| eval previous=substr(previous,1,12), now=substr(policy_sha256,1,12)
+| table _time target previous now server_version formats
+| sort - _time</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Key rotations (currentNumber transitions)</title>
+      <table>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| sort 0 _time
+| foreach key_tables.* [eval kt_&lt;&lt;MATCHSTR&gt;&gt;='&lt;&lt;FIELD&gt;&gt;']
+| streamstats current=f last(kt_*) AS prev_* BY target
+| foreach kt_* [eval changed_&lt;&lt;MATCHSTR&gt;&gt;=if(isnotnull(prev_&lt;&lt;MATCHSTR&gt;&gt;) AND '&lt;&lt;FIELD&gt;&gt;'!=prev_&lt;&lt;MATCHSTR&gt;&gt;, "&lt;&lt;MATCHSTR&gt;&gt;: ".prev_&lt;&lt;MATCHSTR&gt;&gt;." -> ".'&lt;&lt;FIELD&gt;&gt;', null())]
+| eval rotation=coalesce(changed_*)
+| where isnotnull(rotation)
+| table _time target rotation server_version
+| sort - _time</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Fleet: what each target is running</title>
+      <table>
+        <search>
+          <query>`voltage_probe_events` target=$target$
+| stats latest(server_version) AS version latest(district) AS district latest(formats) AS formats latest(policy_fingerprint) AS config latest(key_tables.*) AS key_* latest(_time) AS last_seen BY target
+| eval config=substr(config,1,12), last_seen=strftime(last_seen,"%Y-%m-%d %H:%M:%S")</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ================================================================ alert audit -->
+  <row>
+    <panel>
+      <title>Alert firings over time</title>
+      <chart>
+        <search>
+          <query>`voltage_alerts` status=firing
+| timechart span=15m dc(fingerprint) AS alerts BY alertname</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Time to clear (resolved alerts)</title>
+      <table>
+        <search>
+          <query>`voltage_alerts` status=resolved
+| eval minutes=round((ended-started)/60,1)
+| stats count AS incidents avg(minutes) AS avg_minutes max(minutes) AS max_minutes BY alertname severity
+| eval avg_minutes=round(avg_minutes,1)
+| sort - max_minutes</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"critical":#dc4e41,"warning":#f8be34,"info":#9aa5b1}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Every notification Alertmanager sent (audit trail)</title>
+      <table>
+        <search>
+          <query>`voltage_alerts`
+| eval started=strftime(started,"%Y-%m-%d %H:%M:%S"), ended=strftime(ended,"%Y-%m-%d %H:%M:%S")
+| table _time receiver status alertname severity target format summary started ended
+| sort - _time</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"firing":#dc4e41,"resolved":#53a051}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

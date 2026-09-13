@@ -179,7 +179,8 @@ See [docs/REAL-VOLTAGE.md](docs/REAL-VOLTAGE.md).
 **Ansible:** see the [collection README](ansible_collections/flavioimbertdomingos/voltage/README.md).
 
 **PagerDuty and Splunk:** Alertmanager already routes to both (keys read from files); the exporter
-logs one JSON event per target per cycle for the SIEM. Grafana and Alertmanager stay as they are.
+logs one JSON event per target per cycle for the SIEM, and `splunk/` is an installable Splunk app
+with the dashboard and scheduled searches. Grafana and Alertmanager stay as they are.
 See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ---
@@ -231,6 +232,7 @@ voltage-toolkit/
 │   └── tests/unit/                     modules run as Ansible runs them, against the mock
 ├── prometheus/                         config + 37 alert rules + promtool tests
 ├── alertmanager/ · grafana/            routing, inhibition, PagerDuty + Splunk receivers (secrets/ = demo keys), generated dashboard
+├── splunk/voltage_toolkit/             installable Splunk app: props, macros, scheduled searches, the SIEM dashboard
 ├── demo/                               seed_nonprod.py + canaries.txt: the pretend masked non-prod database
 └── docs/                               METRICS, ALERTS, COVERAGE, SDM, INTEGRATIONS, REAL-VOLTAGE, ARCHITECTURE, FAQ
 ```

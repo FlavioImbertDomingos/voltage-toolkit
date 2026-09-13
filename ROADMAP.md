@@ -277,8 +277,10 @@ booleans only — for a log forwarder; a commented `remote_write` stanza for met
 stdlib **mock** of both APIs so the compose stack proves delivery end to end (CI asserts the
 seeded `SDMMaskLeak` reached both). `docs/INTEGRATIONS.md` has the Splunk searches worth keeping.
 
-Deliberately not done: a Splunk app / dashboards XML, and PagerDuty service provisioning via
-Terraform. Both are the platform team's, not the toolkit's.
+Also shipped: `splunk/voltage_toolkit/`, an installable Splunk app (props, macros, three
+scheduled searches, one Simple XML dashboard) so the SIEM side is a design, not a suggestion.
+Deliberately not done: PagerDuty service provisioning via Terraform — that is the platform
+team's, not the toolkit's.
 
 ---
 

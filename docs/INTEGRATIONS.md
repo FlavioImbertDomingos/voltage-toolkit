@@ -117,6 +117,17 @@ index=security sourcetype=alertmanager alerts{}.labels.alertname=SDMMaskLeak
 | stats avg(mins) max(mins)                                         -- time-to-clear for the assessor
 ```
 
+## The Splunk dashboard
+
+`splunk/voltage_toolkit/` is an installable app: `props.conf` for both sourcetypes, four macros,
+three scheduled searches and a Simple XML dashboard (`voltage_tokenization`). Install it, point
+the `voltage_index` macro at your index, done. The dashboard is four rows, one question each:
+*right now* (latest event per target → single values), *history* (`probes[]` exploded → failures,
+p95, error kinds), *change* (hash and key-number transitions with before/after), and *alert audit*
+(every notification Alertmanager sent, time-to-clear per alert). `splunk/README.md` explains the
+design choices — latest-per-target aggregation, transitions rather than values, no cardinality
+traps — and what has and has not been verified.
+
 ## Proving it without accounts
 
 `mock-integrations/` is a 160-line stdlib server that speaks both protocols where it matters:

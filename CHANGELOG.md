@@ -11,6 +11,9 @@
   compose stack and CI prove delivery without accounts; `alertmanager/secrets/` holds demo keys;
   `docker-compose.override.example.yml` shows the production mount and the Docker `splunk` log driver; commented
   `remote_write` in `prometheus.yml`. `amtool check-config` in CI. `docs/INTEGRATIONS.md`.
+- **Splunk app** `splunk/voltage_toolkit/`: `props.conf` for the `voltage-exporter` and `alertmanager` sourcetypes,
+  macros, three scheduled searches (policy changed outside a window, exporter silent, masking-leak time to clear) and
+  the `voltage_tokenization` Simple XML dashboard (right now / history / change / alert audit). `splunk/README.md`.
 
 ### Fixed
 - Grafana: table panels (formats, certificates, key tables, domain sizes, fleet, coverage, SDM) rendered a raw

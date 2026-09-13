@@ -80,6 +80,16 @@ jobs:
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 check config /p/prometheus.yml
           docker run --rm -v "$PWD/prometheus:/p:ro" --entrypoint promtool prom/prometheus:v3.5.0 test rules /p/alerts/voltage.rules.test.yml
           docker run --rm -v "$PWD/alertmanager:/a:ro" --entrypoint amtool prom/alertmanager:v0.28.1 check-config /a/alertmanager.yml
+      - name: Splunk app is well-formed (XML + .conf)
+        run: |
+          python3 - <<'PY'
+          import configparser, glob, xml.dom.minidom
+          for f in glob.glob("splunk/voltage_toolkit/default/data/ui/**/*.xml", recursive=True):
+              xml.dom.minidom.parse(f); print("xml ok", f)
+          for f in glob.glob("splunk/voltage_toolkit/default/*.conf"):
+              c = configparser.RawConfigParser(strict=False, interpolation=None); c.read(f); assert c.sections(), f
+              print("conf ok", f, len(c.sections()), "stanzas")
+          PY
 
   compose-smoke:
     name: docker compose smoke test
