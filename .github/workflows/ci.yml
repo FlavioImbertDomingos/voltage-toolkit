@@ -120,17 +120,24 @@ jobs:
           docker compose logs voltage-exporter | grep -m1 '"event":"probe","target":"demo-prod"' | grep -q '"policy_ok":true'
       - name: Alerts reach PagerDuty and Splunk (mock)
         run: |
-          for i in $(seq 1 40); do
-            PD=$(curl -sf 'http://localhost:8900/received?kind=pagerduty')
-            if echo "$PD" | grep -q '"event_action": "trigger"' && echo "$PD" | grep -q 'MASKING LEAK'; then break; fi
-            sleep 3
-          done
-          echo "$PD" | grep -q '"event_action": "trigger"' || { docker compose logs alertmanager mock-integrations; exit 1; }
+          # The pager route has group_wait 0s, the Splunk route 10s: wait for each on its own.
+          wait_for() {  # kind, pattern
+            for i in $(seq 1 40); do
+              BODY=$(curl -s "http://localhost:8900/received?kind=$1" || true)
+              if echo "$BODY" | grep -q "$2"; then echo "$BODY"; return 0; fi
+              sleep 3
+            done
+            echo "timed out waiting for $2 at $1" >&2
+            docker compose logs alertmanager mock-integrations >&2
+            return 1
+          }
+          PD=$(wait_for pagerduty 'MASKING LEAK')
+          echo "$PD" | grep -q '"event_action": "trigger"'
           echo "$PD" | grep -q '"severity": "critical"'
           echo "$PD" | grep -q '"class": "SDMMaskLeak"'
-          SP=$(curl -sf 'http://localhost:8900/received?kind=splunk')
+          SP=$(wait_for splunk 'SDMMaskLeak')
           echo "$SP" | grep -q '"ok": true'
-          echo "$SP" | grep -q 'SDMMaskLeak'
+          echo "$SP" | grep -q '"note": "raw"'
       - name: Fleet agrees, then DR diverges
         run: |
           M=$(curl -sf http://localhost:9743/metrics)

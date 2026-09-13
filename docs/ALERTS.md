@@ -46,6 +46,10 @@ Rules: [`prometheus/alerts/voltage.rules.yml`](../prometheus/alerts/voltage.rule
 Alertmanager routing (`alertmanager/alertmanager.yml`): mismatch / format-isolation /
 non-determinism / region-divergence / masking-leak / tokenization-failing / policy-unreachable page immediately; inhibition stops symptom storms (policy down silences
 tokenize alerts; tokenize-failing silences error-rate/latency/auth for the same format).
+Receivers: `pager` → PagerDuty Events API v2, `splunk` → every alert (firing and resolved) to
+Splunk HEC via a `continue: true` route, `default` → Slack/email. Keys come from files under
+`alertmanager/secrets/`; the demo ones point at the `mock-integrations` container. See
+[INTEGRATIONS.md](INTEGRATIONS.md).
 
 Thresholds are in the rule expressions — edit, then `promtool test rules` and
 `curl -X POST localhost:9090/-/reload`.

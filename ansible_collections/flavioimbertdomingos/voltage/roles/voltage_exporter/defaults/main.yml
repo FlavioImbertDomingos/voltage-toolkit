@@ -16,6 +16,7 @@ voltage_exporter_port: 9743
 voltage_exporter_interval_seconds: 30
 voltage_exporter_config_dir: /etc/voltage-exporter
 voltage_exporter_log_level: INFO
+voltage_exporter_log_format: text   # json: one structured event per target per cycle, for a SIEM
 
 # Secrets: the exporter reads them from env vars named in the config (secret_env).
 # Provide them here from a vault; they are written to an env file with mode 0600.

@@ -71,7 +71,9 @@ defaults improve for everyone.
 - [ ] `ca_cert` set; `verify_tls: false` only in the lab
 - [ ] Exporter port 9743 reachable only from Prometheus
 - [ ] Interval agreed with the Voltage owners
-- [ ] `VoltageRoundTripMismatch` and `VoltageTokenizationFailing` route to a pager
+- [ ] `VoltageRoundTripMismatch` and `VoltageTokenizationFailing` route to a pager — real PagerDuty key in
+      `/etc/alertmanager/secrets/pagerduty.key`, the two `DEMO` `url:` lines removed (docs/INTEGRATIONS.md)
+- [ ] `log_format: json` and the container log shipped to the SIEM; Splunk HEC token mounted for Alertmanager
 - [ ] `VoltagePolicyChanged` routes to the change-management channel
 - [ ] Ansible `voltage_policy_audit` runs nightly with `voltage_audit_fail_on_drift: true` in a pipeline
 
