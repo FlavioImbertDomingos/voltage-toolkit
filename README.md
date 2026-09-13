@@ -15,7 +15,7 @@ Two things in one repo:
 
 Plus a mock appliance, so all of it runs with `docker compose up` and no Voltage licence.
 
-<img width="968" height="544" alt="image" src="https://github.com/user-attachments/assets/80abded6-3c78-43f4-87e4-25e58b73fad5" />
+![voltage-toolkit overview: runtime monitoring, configuration + drift control, data coverage — and where the answers go (PagerDuty, Splunk, Grafana)](docs/overview.png)
 
 
 [![CI](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/FlavioImbertDomingos/voltage-toolkit/actions/workflows/ci.yml)
@@ -187,27 +187,27 @@ See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ## What you get
 
-| Signal | Metric / rule | Why it matters |
+| Signal | Why it matters | Metric / rule |
 |---|---|---|
-| Can apps tokenize right now? | `voltage_tokenize_success`, `VoltageTokenizationFailing` | The only question that matters at 3 a.m. |
-| Is the data coming back right? | `voltage_tokenize_roundtrip_ok`, `VoltageRoundTripMismatch` | A wrong detokenize silently corrupts data |
-| Did masking actually mask? | `voltage_sdm_mask_ok{kind}`, `SDMMaskLeak`, `SDMMaskInconsistent` | A planted canary in non-prod, or joins that silently drop rows |
-| Did the archive / masking job run? | `voltage_sdm_job_stale`, `SDMJobStale`, `SDMJobFailing` | Batch jobs fail quietly; the first symptom is a storage bill |
-| Is every sensitive column actually protected? | `voltage_coverage_columns{state}`, `VoltageUnprotectedSensitiveColumn`, `VoltageBrokenProtectionMapping` | Discovery says PAN, the data map says nothing — PCI scope drift, in Prometheus rather than next year's ROC |
-| Would a failover work? | `voltage_fleet_agreement{check="token"}`, `VoltageRegionDivergence` | Two regions, same policy, different tokens: every member round-trips fine alone |
-| Do all nodes serve the same policy? | `voltage_fleet_agreement{check="policy"}`, `VoltagePolicyFleetDivergent` | Propagation is lazy and per node |
-| Is it *correct*, not just working? | `voltage_integrity_ok{check}`, `VoltageFormatIsolationBroken`, `VoltageNonDeterministic`, `VoltageDoubleProtectCorrupts` | Formats sharing a key, non-deterministic protection, double-protect corruption — all return HTTP 200 |
-| How slow? | `voltage_protect_seconds` histogram, `VoltageLatencyHigh` (p95) | Checkout latency budgets |
-| How often does it fail? | `voltage_tokenize_probes_total{result}`, `VoltageErrorRateHigh` | Intermittent failures apps retry around |
-| Why did it fail? | `voltage_tokenize_errors_total{kind=auth\|http\|timeout\|connection\|mismatch}` | "Somebody rotated the shared secret" vs "the box is down" |
-| Can new apps start? | `voltage_policy_up`, `VoltagePolicyUnreachable` | Every client downloads the policy at startup |
-| Did someone change the config? | `voltage_policy_changes_total`, `VoltagePolicyChanged` | PCI change control; drift |
-| Will TLS break on Tuesday? | `voltage_certificate_expiry_timestamp_seconds`, `VoltageCertificateExpiring*` | The #1 cause of "everything stopped" |
-| Are key servers up? | `voltage_keyserver_up` | New identities and key rotation depend on them |
-| Did a key rotate? | `voltage_key_table_current_number`, `VoltageKeyRotated` | The real rotation mechanism is `currentNumber` in the policy — now observable |
-| Is a format too small to be safe? | `voltage_format_domain_size`, `VoltageFormatBelowMinimumDomain` | NIST's 10^6 floor for FF1; the appliance won't tell you |
-| Which columns can't be joined? | `voltage_policy_format_efpe` | eFPE ciphertext differs per key epoch |
-| Are we running out of support? | `voltage_appliance_version_info`, `voltage_support_end_timestamp_seconds` | The version is in the policy file; the dates are in the release notes |
+| **Can apps tokenize right now?** | The only question that matters at 3 a.m. | `voltage_tokenize_success`<br>`VoltageTokenizationFailing` |
+| **Is the data coming back right?** | A wrong detokenize silently corrupts data | `voltage_tokenize_roundtrip_ok`<br>`VoltageRoundTripMismatch` |
+| **Did masking actually mask?** | A planted canary in non-prod, or joins that silently drop rows | `voltage_sdm_mask_ok{kind}`<br>`SDMMaskLeak`<br>`SDMMaskInconsistent` |
+| **Did the archive / masking job run?** | Batch jobs fail quietly; the first symptom is a storage bill | `voltage_sdm_job_stale`<br>`SDMJobStale`<br>`SDMJobFailing` |
+| **Is every sensitive column actually protected?** | Discovery says PAN, the data map says nothing — PCI scope drift, in Prometheus rather than next year's ROC | `voltage_coverage_columns{state}`<br>`VoltageUnprotectedSensitiveColumn`<br>`VoltageBrokenProtectionMapping` |
+| **Would a failover work?** | Two regions, same policy, different tokens: every member round-trips fine alone | `voltage_fleet_agreement{check="token"}`<br>`VoltageRegionDivergence` |
+| **Do all nodes serve the same policy?** | Propagation is lazy and per node | `voltage_fleet_agreement{check="policy"}`<br>`VoltagePolicyFleetDivergent` |
+| **Is it *correct*, not just working?** | Formats sharing a key, non-deterministic protection, double-protect corruption — all return HTTP 200 | `voltage_integrity_ok{check}`<br>`VoltageFormatIsolationBroken`<br>`VoltageNonDeterministic`<br>`VoltageDoubleProtectCorrupts` |
+| **How slow?** | Checkout latency budgets | `voltage_protect_seconds` histogram<br>`VoltageLatencyHigh` (p95) |
+| **How often does it fail?** | Intermittent failures apps retry around | `voltage_tokenize_probes_total{result}`<br>`VoltageErrorRateHigh` |
+| **Why did it fail?** | "Somebody rotated the shared secret" vs "the box is down" | `voltage_tokenize_errors_total{kind=auth\|http\|timeout\|connection\|mismatch}` |
+| **Can new apps start?** | Every client downloads the policy at startup | `voltage_policy_up`<br>`VoltagePolicyUnreachable` |
+| **Did someone change the config?** | PCI change control; drift | `voltage_policy_changes_total`<br>`VoltagePolicyChanged` |
+| **Will TLS break on Tuesday?** | The #1 cause of "everything stopped" | `voltage_certificate_expiry_timestamp_seconds`<br>`VoltageCertificateExpiring*` |
+| **Are key servers up?** | New identities and key rotation depend on them | `voltage_keyserver_up` |
+| **Did a key rotate?** | The real rotation mechanism is `currentNumber` in the policy — now observable | `voltage_key_table_current_number`<br>`VoltageKeyRotated` |
+| **Is a format too small to be safe?** | NIST's 10^6 floor for FF1; the appliance won't tell you | `voltage_format_domain_size`<br>`VoltageFormatBelowMinimumDomain` |
+| **Which columns can't be joined?** | eFPE ciphertext differs per key epoch | `voltage_policy_format_efpe` |
+| **Are we running out of support?** | The version is in the policy file; the dates are in the release notes | `voltage_appliance_version_info`<br>`voltage_support_end_timestamp_seconds` |
 
 37 alert rules with runbook-style descriptions (unit-tested with promtool), Alertmanager
 routing with inhibition and receivers for PagerDuty and Splunk, a Grafana dashboard, and JSON
