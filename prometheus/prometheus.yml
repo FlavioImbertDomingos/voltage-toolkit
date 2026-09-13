@@ -14,6 +14,13 @@ scrape_configs:
   - job_name: voltage-exporter
     static_configs:
       - targets: ["voltage-exporter:9743"]
+  # Root of trust (roadmap R11): the HSM that anchors the district master secret, monitored by the
+  # sister project luna-exporter (github.com/FlavioImbertDomingos/luna-exporter). The Grafana row
+  # "Root of trust" reads luna_up, luna_hsm_info, luna_hsm_tamper_events, luna_hsm_fips_mode_enabled
+  # and shows "No data" until this job exists.
+  # - job_name: luna-exporter
+  #   static_configs:
+  #     - targets: ["luna-exporter:9744"]
 
 # Ship the metrics themselves to Splunk as well (roadmap R17, docs/INTEGRATIONS.md). Grafana keeps
 # reading this Prometheus; Splunk gets a copy for long retention and correlation.

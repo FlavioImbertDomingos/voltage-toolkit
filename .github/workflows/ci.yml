@@ -125,6 +125,21 @@ jobs:
           echo "$M" | grep -q 'voltage_sdm_mask_ok{check="nonprod-pan-ri",kind="consistency"} 1.0'
           echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="mask-nonprod-refresh"} 1.0'
           echo "$M" | grep -q 'voltage_sdm_job_stale{check="sdm",job="archive-orders-2019"} 0.0'
+      - name: Identity activity, restore drills and console (R10, R11, R16)
+        run: |
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q '^voltage_identity_activity_up 1.0'
+          echo "$M" | grep -q 'voltage_identity_activity_spike{event="key_request",identity="batch-etl@demo.bank"} 1.0'
+          echo "$M" | grep -q 'voltage_identity_undeclared{identity="svc-reporting@demo.bank"} 1.0'
+          echo "$M" | grep -q 'voltage_restore_drill_ok{district="prod",drill="prod-identity-backup"} 1.0'
+          echo "$M" | grep -q 'voltage_restore_drill_last_failed{district="dr",drill="dr-identity-backup"} 1.0'
+          echo "$M" | grep -q 'voltage_console_up{target="demo-prod"} 1.0'
+          curl -sf -X POST http://localhost:8800/mock/scenario/console-down
+          sleep 20
+          M=$(curl -sf http://localhost:9743/metrics)
+          echo "$M" | grep -q 'voltage_console_up{target="demo-prod"} 0.0'
+          echo "$M" | grep -q 'voltage_tokenize_success{format="CC",identity="probe@demo.bank",target="demo-prod"} 1.0'
+          curl -sf -X POST http://localhost:8800/mock/scenario/healthy
       - name: Structured log events from the exporter
         run: |
           docker compose logs voltage-exporter | grep -m1 '"event":"probe","target":"demo-prod"' | grep -q '"policy_ok":true'

@@ -364,3 +364,125 @@ tests:
         exp_samples:
           - labels: 'voltage:tokenize_error_ratio_10m{target="prod", format="CC"}'
             value: 0.5
+
+  # R16: the console is control plane only -- a warning, never a page, and never a tokenization alert
+  - interval: 15s
+    input_series:
+      - series: 'voltage_console_up{target="prod"}'
+        values: "1 1 0x30"
+      - series: 'voltage_policy_up{target="prod"}'
+        values: "1x32"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: VoltageConsoleUnreachable
+        exp_alerts:
+          - exp_labels: {severity: warning, target: prod}
+            exp_annotations:
+              summary: "Management Console unreachable on prod (protection unaffected)"
+              description: "Control plane only: tokenization keeps working, key servers keep serving. Only one console instance is active per deployment, so while it is down no policy change, new identity or audit review is possible. Do not page for this; do fix it before the next change window."
+      - eval_time: 6m
+        alertname: VoltagePolicyUnreachable
+        exp_alerts: []
+
+  # R10a: identity activity -- spike, auth failures, new + undeclared, stale export
+  - interval: 15s
+    input_series:
+      - series: 'voltage_identity_activity_spike{identity="batch-etl@demo.bank",event="key_request"}'
+        values: "1x30"
+      - series: 'voltage_identity_events{identity="batch-etl@demo.bank",event="key_request"}'
+        values: "206x30"
+      - series: 'voltage_identity_events_baseline{identity="batch-etl@demo.bank",event="key_request"}'
+        values: "5x30"
+      - series: 'voltage_identity_events{identity="svc-reporting@demo.bank",event="auth_fail"}'
+        values: "30x30"
+      - series: 'voltage_identity_new{identity="svc-reporting@demo.bank"}'
+        values: "1x30"
+      - series: 'voltage_identity_undeclared{identity="svc-reporting@demo.bank"}'
+        values: "1x50"
+      - series: 'voltage_identity_audit_age_seconds'
+        values: "60x30 9000x70"
+      - series: 'voltage_identity_activity_window_seconds'
+        values: "3600x100"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: VoltageIdentityActivitySpike
+        exp_alerts:
+          - exp_labels: {severity: warning, identity: "batch-etl@demo.bank", event: key_request}
+            exp_annotations:
+              summary: "batch-etl@demo.bank: key requests 206 this window vs baseline 5"
+              description: "A step change in key issuance for one identity: a new batch job, a client restart storm, a rotated secret being retried, or someone pulling keys for every format at once. Key issuance is the control-plane edge of bulk detokenization -- the appliance cannot see cached client-side access() calls, but it sees this. Match it to a change or a job schedule; if neither, treat as a potential exfiltration precursor."
+      - eval_time: 6m
+        alertname: VoltageIdentityAuthFailures
+        exp_alerts:
+          - exp_labels: {severity: warning, identity: "svc-reporting@demo.bank", event: auth_fail}
+            exp_annotations:
+              summary: "svc-reporting@demo.bank: 30 authentication failures this window"
+              description: "Repeated failed authentication for one identity. Benign cause: a secret rotated and one client was not updated. Malicious cause: credential guessing against a service identity. Either way the client host in the audit export names the source."
+      - eval_time: 1m
+        alertname: VoltageNewIdentityActive
+        exp_alerts:
+          - exp_labels: {severity: info, identity: "svc-reporting@demo.bank"}
+            exp_annotations:
+              summary: "New identity active: svc-reporting@demo.bank"
+              description: "Seen for the first time in the baseline period. Expected after onboarding an application; otherwise ask who created it -- new identities are a Management Console admin action and appear in its audit log."
+      - eval_time: 11m
+        alertname: VoltageUndeclaredIdentity
+        exp_alerts:
+          - exp_labels: {severity: warning, identity: "svc-reporting@demo.bank"}
+            exp_annotations:
+              summary: "Identity active but not declared: svc-reporting@demo.bank"
+              description: "Using keys, but absent from declared_identities (the desired-state document). Either the rulebook is behind reality -- fix the config-as-code -- or something is authenticating that nobody approved. The Ansible audit role reports the same drift from the other side."
+      - eval_time: 7m
+        alertname: VoltageIdentityAuditStale
+        exp_alerts: []
+      - eval_time: 24m
+        alertname: VoltageIdentityAuditStale
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "Appliance audit export is stale (2h 30m 0s since the newest event)"
+              description: "No new audit events for two windows. Either every identity went quiet (unlikely with an exporter probing) or the export/forwarding stopped -- in which case the identity alerts above are blind."
+
+  # R11: restore drills -- never tested, overdue, failed
+  - interval: 15s
+    input_series:
+      - series: 'voltage_restore_drill_up{drill="prod",district="prod"}'
+        values: "1x300"
+      - series: 'voltage_restore_drill_overdue{drill="prod",district="prod"}'
+        values: "0x300"
+      - series: 'voltage_identity_backup_restore_tested_timestamp_seconds{drill="prod",district="prod"}'
+        values: "0x300"
+      - series: 'voltage_restore_drill_up{drill="dr",district="dr"}'
+        values: "1x300"
+      - series: 'voltage_restore_drill_overdue{drill="dr",district="dr"}'
+        values: "1x300"
+      - series: 'voltage_restore_drill_last_failed{drill="dr",district="dr"}'
+        values: "1x300"
+      - series: 'voltage_identity_backup_restore_tested_timestamp_seconds{drill="dr",district="dr"}'
+        values: "-8640000x300"
+      - series: 'voltage_restore_drill_up{drill="new",district="lab"}'
+        values: "1x300"
+      - series: 'voltage_restore_drill_overdue{drill="new",district="lab"}'
+        values: "1x300"
+    alert_rule_test:
+      - eval_time: 61m
+        alertname: VoltageRestoreDrillNeverTested
+        exp_alerts:
+          - exp_labels: {severity: warning, drill: new, district: lab}
+            exp_annotations:
+              summary: "Restore drill new (lab) has never succeeded"
+              description: "No successful tested restore of the identity backup on record. Stateless key management has no token vault to fall back on: an unrestorable identity backup means every token ever issued in this district is unrecoverable. Schedule the drill (docs/ROOT-OF-TRUST.md)."
+      - eval_time: 61m
+        alertname: VoltageRestoreDrillOverdue
+        exp_alerts:
+          - exp_labels: {severity: warning, drill: dr, district: dr}
+            exp_annotations:
+              summary: "Restore drill dr (dr) overdue: last success 100 days ago"
+              description: "Older than max_age. The backup may still be good; nobody has proved it recently, and the appliance version, HSM firmware or Security World may have changed since. Run the drill."
+      - eval_time: 1m
+        alertname: VoltageRestoreDrillFailed
+        exp_alerts:
+          - exp_labels: {severity: critical, drill: dr, district: dr}
+            exp_annotations:
+              summary: "Restore drill dr (dr): most recent attempt FAILED"
+              description: "The identity backup did not restore cleanly. Until it does, assume the district cannot be rebuilt after an HSM or appliance loss. Two public restore defects exist in the community wiki; check the version-specific notes before retrying."

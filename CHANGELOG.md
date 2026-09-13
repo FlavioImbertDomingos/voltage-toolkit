@@ -3,6 +3,24 @@
 ## [Unreleased]
 
 ### Added
+- **Control plane & root of trust** (roadmap R10, R11, R16):
+  - R16 `console_url` per target → `voltage_console_up` / `voltage_console_response_seconds`, alert
+    `VoltageConsoleUnreachable` (warning; the runbook says protection is unaffected), mock scenario `console-down`.
+  - R10a `identity_activity:` reads the appliance audit export (SQL or CSV) and reports per-identity auth and
+    key-issuance counts against a median baseline: `voltage_identity_events`, `_events_baseline`, `_activity_ratio`,
+    `_activity_spike`, `voltage_identity_new`, `voltage_identity_undeclared`, `voltage_identity_audit_age_seconds`;
+    alerts `VoltageIdentityActivitySpike`, `VoltageIdentityAuthFailures`, `VoltageNewIdentityActive`,
+    `VoltageUndeclaredIdentity`, `VoltageIdentityAuditStale`, `VoltageIdentityAuditUnreadable`.
+  - R10b `docs/VISIBILITY.md`: what a Voltage monitor can and cannot see (client-side key caching), and the question
+    for a vendor SE.
+  - R11 `restore_drills:` → `voltage_identity_backup_restore_tested_timestamp_seconds`, `voltage_restore_drill_ok`,
+    `_overdue`, `_last_failed`; alerts `VoltageRestoreDrillNeverTested`, `VoltageRestoreDrillOverdue`,
+    `VoltageRestoreDrillFailed` (critical), `VoltageRestoreDrillEvidenceUnreadable`; Grafana "Root of trust" row
+    joining the drills with luna-exporter's `luna_*` series (scrape job stub in `prometheus.yml`);
+    `docs/ROOT-OF-TRUST.md` documents the drill.
+  - Demo: the seeded database gains a 48 h audit export (one key-issuance spike, one undeclared identity failing
+    auth) and restore-drill evidence (DR's last attempt failed). Grafana gains "Identity activity" and
+    "Root of trust" rows. 48 alert rules.
 - **Enterprise integrations** (roadmap R17): Alertmanager receivers for PagerDuty (Events API v2, `routing_key_file`,
   severity/class/component from labels, auto-resolve) and Splunk (HEC raw endpoint via `webhook_configs` with
   `url_file` + `credentials_file`, fed by a `continue: true` route so every firing and resolution is archived).

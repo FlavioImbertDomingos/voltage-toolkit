@@ -150,6 +150,22 @@ panels = [
     ),  # fmt: skip
     stat("Formats in policy", f"sum(voltage_policy_formats{{{SEL}}})", 4, 5, w=4),
     stat(
+        "Mgmt Console",
+        f"min(voltage_console_up{{{SEL}}})",
+        20,
+        5,
+        w=4,
+        mappings=[
+            {
+                "type": "value",
+                "options": {
+                    "0": {"text": "DOWN · control plane", "color": "orange"},
+                    "1": {"text": "UP", "color": "green"},
+                },
+            }
+        ],
+    ),  # fmt: skip
+    stat(
         "Policy changes (24h)",
         f"sum(increase(voltage_policy_changes_total{{{SEL}}}[24h]))",
         8,
@@ -372,6 +388,110 @@ panels = [
         w=12,
         h=6,
         rename={"Value": "hours"},
+    ),
+    # ---------------------------------------------------------------- R10a: identity activity
+    row("Identity activity — what the appliance can see (auth + key issuance)", 90),
+    stat(
+        "Identities active",
+        "voltage_identities_active",
+        0,
+        91,
+    ),
+    stat(
+        "Spikes now",
+        "sum(voltage_identity_activity_spike) or vector(0)",
+        4,
+        91,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Auth failures (window)",
+        'sum(voltage_identity_events{event="auth_fail"}) or vector(0)',
+        8,
+        91,
+        thr=thresholds(("green", None), ("orange", 10), ("red", 50)),
+    ),
+    stat(
+        "New / undeclared",
+        "(count(voltage_identity_new) or vector(0)) + (count(voltage_identity_undeclared) or vector(0))",
+        12,
+        91,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Audit export age",
+        "voltage_identity_audit_age_seconds",
+        16,
+        91,
+        unit="s",
+        decimals=0,
+        thr=thresholds(("green", None), ("orange", 3600), ("red", 7200)),
+    ),
+    timeseries(
+        "Key requests per window, by identity",
+        [target('voltage_identity_events{event="key_request"}', "{{identity}}")],
+        0,
+        95,
+        w=12,
+        h=7,
+    ),
+    table(
+        "Current window vs baseline",
+        "voltage_identity_activity_ratio",
+        12,
+        95,
+        w=12,
+        h=7,
+        rename={"Value": "ratio"},
+    ),
+    # ---------------------------------------------------------------- R11: root of trust
+    row("Root of trust — HSM (luna-exporter) and the identity backup restore drill", 102),
+    stat(
+        "Restore drills OK",
+        "(sum(voltage_restore_drill_ok) or vector(0))",
+        0,
+        103,
+        thr=thresholds(("red", None), ("green", 1)),
+    ),
+    stat(
+        "Drills overdue / never",
+        "sum(voltage_restore_drill_overdue) or vector(0)",
+        4,
+        103,
+        thr=thresholds(("green", None), ("orange", 1)),
+    ),
+    stat(
+        "Last drill failed",
+        "sum(voltage_restore_drill_last_failed) or vector(0)",
+        8,
+        103,
+        thr=thresholds(("green", None), ("red", 1)),
+    ),
+    stat("HSMs up (luna_up)", "min(luna_up)", 12, 103, mappings=UPDOWN),
+    stat(
+        "HSM tamper events",
+        "sum(luna_hsm_tamper_events) or vector(0)",
+        16,
+        103,
+        thr=thresholds(("green", None), ("red", 1)),
+    ),
+    stat("HSM FIPS mode", "min(luna_hsm_fips_mode_enabled)", 20, 103, mappings=UPDOWN),
+    table(
+        "Restore drills: days since last tested restore",
+        "sort_desc(voltage:restore_drill_days_since_success)",
+        0,
+        107,
+        w=12,
+        h=6,
+        rename={"Value": "days"},
+    ),
+    table(
+        "HSM inventory (luna-exporter)",
+        "luna_hsm_info",
+        12,
+        107,
+        w=12,
+        h=6,
     ),
 ]
 

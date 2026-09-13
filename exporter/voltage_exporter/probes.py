@@ -76,6 +76,8 @@ class TargetResult:
     tokenize: list[TokenizeResult] = field(default_factory=list)
     tls: list[TlsResult] = field(default_factory=list)
     keyservers: dict[str, bool] = field(default_factory=dict)
+    console_up: bool | None = None  # None = no console_url configured (R16)
+    console_seconds: float | None = None
     integrity: list[IntegrityResult] = field(default_factory=list)
     duration: float = 0.0
 
@@ -259,6 +261,22 @@ def run_target(target: Target) -> TargetResult:
                 out.keyservers[url] = r.status_code < 500
             except Exception:  # noqa: BLE001
                 out.keyservers[url] = False
+
+    # 5. Management Console (control plane). Only one instance is active per deployment; its
+    #    outage blocks policy changes and admin work but *not* protection. Any HTTP answer
+    #    below 500 counts as up: a login page is a healthy console.
+    if target.console_url:
+        t0 = time.perf_counter()
+        try:
+            r = client.session.get(target.console_url, timeout=target.timeout, verify=target.verify_tls)
+            out.console_up = r.status_code < 500
+        except Exception:  # noqa: BLE001
+            out.console_up = False
+        out.console_seconds = time.perf_counter() - t0
+        if target.console_url.startswith("https") and host_port(target.console_url) not in hosts:
+            hp = host_port(target.console_url)
+            if hp[0]:
+                out.tls.append(run_tls(hp[0], hp[1], target.timeout))
 
     out.duration = time.perf_counter() - started
     return out

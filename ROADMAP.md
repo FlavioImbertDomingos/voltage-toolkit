@@ -26,9 +26,11 @@ data only, no production values.
 | R7 data map | ✅ shipped — `feat: coverage` |
 | R8 masking-quality probes | ✅ shipped — `feat: sdm checks` |
 | R9 batch-job exporter | ✅ shipped — `feat: sdm checks` (inside voltage-exporter, not a sibling repo) |
-| R16 console reachability | next |
+| R16 console reachability | ✅ shipped — `feat: control plane & root of trust` |
 | R17 enterprise integrations | ✅ shipped — `feat: enterprise integrations` |
-| R10–R11, R13–R14 | planned |
+| R10 identity activity + visibility gap | ✅ shipped — `feat: control plane & root of trust` (R10a metric, R10b docs/VISIBILITY.md) |
+| R11 root of trust | ✅ shipped — `feat: control plane & root of trust` (restore-drill freshness; luna-exporter row) |
+| R13 Sentry, R14 PQC posture | next |
 | R12 version and lifecycle | ✅ shipped — `feat: policy intelligence` |
 | R15 cross-region token equivalence | ✅ shipped — `feat: fleet agreement` |
 
@@ -162,7 +164,7 @@ sibling repo if the config surface diverges.
 
 ## Horizon 3 — the things that break a working deployment
 
-### R10. Detokenize-rate anomaly detection · **M**
+### R10. Detokenize-rate anomaly detection · **M** · ✅ shipped
 
 Bulk `access` is the exfiltration pattern, and it is the one thing a crypto service is uniquely
 placed to see. Per-identity counters with a step-change alert covers PCI DSS requirement 10 and
@@ -182,7 +184,7 @@ from the stateless-key design)*. So this item is really two:
   caching?* An honest "here is what this cannot see" is worth more than a metric that implies
   coverage it does not have.
 
-### R11. HSM root-of-trust and migration monitoring · **M**
+### R11. HSM root-of-trust and migration monitoring · **M** · ✅ shipped
 
 Stateless key management anchors the district master secret in an HSM — that is the whole
 root of trust, and there is no per-key revocation. Two live pressures:
@@ -252,7 +254,7 @@ per region. Clients cold-start by URL, so a failover that moves the web service 
 policy host means existing clients keep running on cache while new processes cannot initialize —
 an outage that arrives over hours and passes a naive failover test.
 
-### R16. Management Console reachability · **S**
+### R16. Management Console reachability · **S** · ✅ shipped
 
 The Common Criteria Security Target states only **one Management Console instance is active per
 deployment**. The data path is active/active; the control plane is not. A console outage costs

@@ -104,6 +104,7 @@ def target_event(r: TargetResult) -> dict:
         "integrity_failed": [f"{i.check}:{i.format}" for i in r.integrity if i.ok is False],
         "keyservers_up": sum(1 for ok in r.keyservers.values() if ok),
         "keyservers_total": len(r.keyservers),
+        "console_up": r.console_up,
         "tls_ok": all(t.ok for t in r.tls) if r.tls else None,
         "tls_min_days": round((min(not_afters) - now) / 86400, 1) if not_afters else None,
         "duration_ms": _ms(r.duration),

@@ -28,6 +28,8 @@ groups:
         expr: (time() - voltage_coverage_feed_mtime_seconds) / 86400
       - record: voltage:sdm_job_hours_since_success
         expr: (time() - voltage_sdm_job_last_success_timestamp_seconds) / 3600
+      - record: voltage:restore_drill_days_since_success
+        expr: (time() - voltage_identity_backup_restore_tested_timestamp_seconds) / 86400
 
   - name: voltage-availability
     rules:
@@ -62,6 +64,14 @@ groups:
         annotations:
           summary: "Key server {{ $labels.url }} down ({{ $labels.target }})"
           description: "Clients with cached keys keep working; anything needing a new key (new identity, key rotation, cold start) fails."
+
+      - alert: VoltageConsoleUnreachable
+        expr: voltage_console_up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Management Console unreachable on {{ $labels.target }} (protection unaffected)"
+          description: "Control plane only: tokenization keeps working, key servers keep serving. Only one console instance is active per deployment, so while it is down no policy change, new identity or audit review is possible. Do not page for this; do fix it before the next change window."
 
   - name: voltage-tokenization
     rules:
@@ -332,3 +342,88 @@ groups:
         annotations:
           summary: "SDM check {{ $labels.check }} ({{ $labels.kind }}) cannot read its source"
           description: "Database unreachable, credentials rejected, query invalid, or export file missing. The check's other metrics are stale until fixed; see exporter logs."
+
+  - name: voltage-identity-activity
+    rules:
+      # R10a -- what the appliance can see: authentication and key issuance per identity.
+      # docs/VISIBILITY.md explains why per-transaction protect/access counts are NOT here.
+      - alert: VoltageIdentityActivitySpike
+        expr: voltage_identity_activity_spike{event="key_request"} == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.identity }}: key requests {{ with printf `voltage_identity_events{identity=\"%s\",event=\"key_request\"}` $labels.identity | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }} this window vs baseline {{ with printf `voltage_identity_events_baseline{identity=\"%s\",event=\"key_request\"}` $labels.identity | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }}"
+          description: "A step change in key issuance for one identity: a new batch job, a client restart storm, a rotated secret being retried, or someone pulling keys for every format at once. Key issuance is the control-plane edge of bulk detokenization -- the appliance cannot see cached client-side access() calls, but it sees this. Match it to a change or a job schedule; if neither, treat as a potential exfiltration precursor."
+
+      - alert: VoltageIdentityAuthFailures
+        expr: voltage_identity_events{event="auth_fail"} >= 10
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.identity }}: {{ $value | printf \"%.0f\" }} authentication failures this window"
+          description: "Repeated failed authentication for one identity. Benign cause: a secret rotated and one client was not updated. Malicious cause: credential guessing against a service identity. Either way the client host in the audit export names the source."
+
+      - alert: VoltageNewIdentityActive
+        expr: voltage_identity_new == 1
+        labels: {severity: info}
+        annotations:
+          summary: "New identity active: {{ $labels.identity }}"
+          description: "Seen for the first time in the baseline period. Expected after onboarding an application; otherwise ask who created it -- new identities are a Management Console admin action and appear in its audit log."
+
+      - alert: VoltageUndeclaredIdentity
+        expr: voltage_identity_undeclared == 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Identity active but not declared: {{ $labels.identity }}"
+          description: "Using keys, but absent from declared_identities (the desired-state document). Either the rulebook is behind reality -- fix the config-as-code -- or something is authenticating that nobody approved. The Ansible audit role reports the same drift from the other side."
+
+      - alert: VoltageIdentityAuditStale
+        expr: voltage_identity_audit_age_seconds > 2 * voltage_identity_activity_window_seconds
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Appliance audit export is stale ({{ $value | humanizeDuration }} since the newest event)"
+          description: "No new audit events for two windows. Either every identity went quiet (unlikely with an exporter probing) or the export/forwarding stopped -- in which case the identity alerts above are blind."
+
+      - alert: VoltageIdentityAuditUnreadable
+        expr: voltage_identity_activity_up == 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Identity activity: audit export cannot be read"
+          description: "Database unreachable, credentials rejected, query invalid, or export file missing. See exporter logs."
+
+  - name: voltage-root-of-trust
+    rules:
+      # R11 -- the identity / master-secret backup is the whole root of trust; prove it restores.
+      - alert: VoltageRestoreDrillNeverTested
+        expr: voltage_restore_drill_overdue == 1 unless voltage_identity_backup_restore_tested_timestamp_seconds
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Restore drill {{ $labels.drill }} ({{ $labels.district }}) has never succeeded"
+          description: "No successful tested restore of the identity backup on record. Stateless key management has no token vault to fall back on: an unrestorable identity backup means every token ever issued in this district is unrecoverable. Schedule the drill (docs/ROOT-OF-TRUST.md)."
+
+      - alert: VoltageRestoreDrillOverdue
+        expr: voltage_restore_drill_overdue == 1 and voltage:restore_drill_days_since_success > 0
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Restore drill {{ $labels.drill }} ({{ $labels.district }}) overdue: last success {{ with printf `voltage:restore_drill_days_since_success{drill=\"%s\",district=\"%s\"}` $labels.drill $labels.district | query }}{{ . | first | value | printf \"%.0f\" }}{{ end }} days ago"
+          description: "Older than max_age. The backup may still be good; nobody has proved it recently, and the appliance version, HSM firmware or Security World may have changed since. Run the drill."
+
+      - alert: VoltageRestoreDrillFailed
+        expr: voltage_restore_drill_last_failed == 1
+        labels: {severity: critical}
+        annotations:
+          summary: "Restore drill {{ $labels.drill }} ({{ $labels.district }}): most recent attempt FAILED"
+          description: "The identity backup did not restore cleanly. Until it does, assume the district cannot be rebuilt after an HSM or appliance loss. Two public restore defects exist in the community wiki; check the version-specific notes before retrying."
+
+      - alert: VoltageRestoreDrillEvidenceUnreadable
+        expr: voltage_restore_drill_up == 0
+        for: 1h
+        labels: {severity: warning}
+        annotations:
+          summary: "Restore drill {{ $labels.drill }}: evidence source cannot be read"
+          description: "The drill may have run; the exporter cannot see it. Fix the source before the freshness alert is trusted either way."

@@ -20,9 +20,11 @@ from .config import Config
 from .coverage import STATES, CoverageReport
 from .fleet import FleetCheck
 from .fleet import evaluate as evaluate_fleet
+from .identity_activity import IdentityActivityReport
 from .lifecycle import split_version, support_end
 from .policy import MIN_FPE_DOMAIN, format_domain_size, is_efpe
 from .probes import TargetResult, run_target
+from .restore_drills import DrillResult
 from .sdm import JobResult, MaskResult
 from .structured import EVENT_ATTR, summary_line, target_event
 
@@ -169,11 +171,46 @@ sdm_job_rows = Gauge(f"{NS}_sdm_job_last_rows", "Rows processed by the most rece
 sdm_job_stale = Gauge(f"{NS}_sdm_job_stale", "1 if the job has not succeeded within expect_every", ["check", "job"])
 sdm_job_failing = Gauge(f"{NS}_sdm_job_failing", "1 if the job's most recent run failed", ["check", "job"])
 
+# ---- identity activity (R10a): what the appliance *can* see -- auth and key issuance per identity
+identity_activity_up = Gauge(f"{NS}_identity_activity_up", "1 if the audit export could be read and evaluated")
+identity_events = Gauge(f"{NS}_identity_events", "Audit events in the current window", ["identity", "event"])
+identity_baseline = Gauge(
+    f"{NS}_identity_events_baseline", "Median events per window over the previous windows", ["identity", "event"]
+)
+identity_ratio = Gauge(
+    f"{NS}_identity_activity_ratio", "Current window / baseline (absent: no history)", ["identity", "event"]
+)
+identity_spike = Gauge(
+    f"{NS}_identity_activity_spike", "1 if the current window is a step change vs baseline", ["identity", "event"]
+)
+identity_new = Gauge(
+    f"{NS}_identity_new", "1 if the identity is active now and was never seen in the baseline", ["identity"]
+)
+identity_undeclared = Gauge(f"{NS}_identity_undeclared", "1 if active now but not in declared_identities", ["identity"])
+identity_active = Gauge(f"{NS}_identities_active", "Identities with any event in the current window")
+identity_audit_age = Gauge(f"{NS}_identity_audit_age_seconds", "Age of the newest audit event")
+identity_window = Gauge(f"{NS}_identity_activity_window_seconds", "Window the counts cover")
+
+# ---- restore drills (R11): the root-of-trust backup, proven restorable
+drill_up = Gauge(f"{NS}_restore_drill_up", "1 if the drill's evidence could be read", ["drill", "district"])
+drill_ok = Gauge(f"{NS}_restore_drill_ok", "1 if the last drill succeeded and is within max_age", ["drill", "district"])
+drill_last_success = Gauge(
+    f"{NS}_identity_backup_restore_tested_timestamp_seconds", "Last successful tested restore", ["drill", "district"]
+)
+drill_last_attempt = Gauge(f"{NS}_restore_drill_last_attempt_timestamp_seconds", "Last attempt", ["drill", "district"])
+drill_overdue = Gauge(f"{NS}_restore_drill_overdue", "1 if never tested or older than max_age", ["drill", "district"])
+drill_failed = Gauge(f"{NS}_restore_drill_last_failed", "1 if the most recent attempt failed", ["drill", "district"])
+drill_max_age = Gauge(f"{NS}_restore_drill_max_age_seconds", "Configured freshness limit", ["drill", "district"])
+
 # ---- tls / key servers
 cert_expiry = Gauge(f"{NS}_certificate_expiry_timestamp_seconds", "Certificate notAfter", ["target", "host", "subject"])
 cert_ok = Gauge(f"{NS}_tls_up", "1 if a TLS handshake with the host succeeded", ["target", "host"])
 tls_version = Gauge(f"{NS}_tls_version_info", "Negotiated TLS version (always 1)", ["target", "host", "version"])
 keyserver_up = Gauge(f"{NS}_keyserver_up", "1 if the key server URL answered", ["target", "url"])
+console_up = Gauge(
+    f"{NS}_console_up", "1 if the Management Console answered (control plane; protection unaffected)", ["target"]
+)
+console_seconds = Gauge(f"{NS}_console_response_seconds", "Management Console response time", ["target"])
 
 # ---- exporter
 scrape_duration = Gauge(f"{NS}_probe_cycle_seconds", "Time the last full probe cycle took", ["target"])
@@ -290,6 +327,10 @@ def apply(result: TargetResult) -> None:
 
     for url, up in result.keyservers.items():
         keyserver_up.labels(t, url).set(1.0 if up else 0.0)
+    if result.console_up is not None:
+        console_up.labels(t).set(1.0 if result.console_up else 0.0)
+        if result.console_seconds is not None:
+            console_seconds.labels(t).set(result.console_seconds)
 
     scrape_duration.labels(t).set(result.duration)
     last_run.labels(t).set(time.time())
@@ -378,6 +419,54 @@ def apply_sdm(masks: list[MaskResult], jobs: list[JobResult]) -> None:
             log.error("[sdm %s] JOBS: %s", c, j.detail)
 
 
+def apply_identity_activity(rep: IdentityActivityReport, window_seconds: float) -> None:
+    if rep.ok is None:
+        identity_activity_up.set(0.0)
+        log.warning("[identity-activity] %s", rep.detail)
+        return
+    identity_activity_up.set(1.0)
+    identity_window.set(window_seconds)
+    identity_active.set(float(rep.identities))
+    if rep.newest_ts is not None:
+        identity_audit_age.set(max(0.0, time.time() - rep.newest_ts))
+    for g in (identity_events, identity_baseline, identity_ratio, identity_spike, identity_new, identity_undeclared):
+        g.clear()
+    spikes = {(s.identity, s.event) for s in rep.spikes}
+    for w in rep.windows:
+        identity_events.labels(w.identity, w.event).set(float(w.current))
+        if w.baseline is not None:
+            identity_baseline.labels(w.identity, w.event).set(float(w.baseline))
+        if w.ratio is not None and w.ratio != float("inf"):
+            identity_ratio.labels(w.identity, w.event).set(w.ratio)
+        identity_spike.labels(w.identity, w.event).set(1.0 if (w.identity, w.event) in spikes else 0.0)
+    for ident in rep.new_identities:
+        identity_new.labels(ident).set(1.0)
+    for ident in rep.undeclared:
+        identity_undeclared.labels(ident).set(1.0)
+    if rep.spikes or rep.undeclared:
+        log.warning("[identity-activity] %s", rep.detail)
+    else:
+        log.info("[identity-activity] %s", rep.detail)
+
+
+def apply_restore_drills(results: list[DrillResult]) -> None:
+    for r in results:
+        d, dist = r.drill.name, r.drill.district
+        drill_up.labels(d, dist).set(0.0 if r.ok is None else 1.0)
+        drill_max_age.labels(d, dist).set(r.drill.max_age_seconds)
+        if r.ok is None:
+            log.warning("[restore-drill %s] %s", d, r.detail)
+            continue
+        drill_ok.labels(d, dist).set(1.0 if r.ok else 0.0)
+        drill_overdue.labels(d, dist).set(1.0 if r.overdue else 0.0)
+        drill_failed.labels(d, dist).set(1.0 if r.last_failed else 0.0)
+        if r.last_success is not None:
+            drill_last_success.labels(d, dist).set(r.last_success)
+        if r.last_attempt is not None:
+            drill_last_attempt.labels(d, dist).set(r.last_attempt)
+        (log.error if not r.ok else log.info)("[restore-drill %s] %s", d, r.detail)
+
+
 def probe_loop(config: Config, stop: threading.Event) -> None:
     configure(config)
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(config.targets)))) as pool:
@@ -399,6 +488,16 @@ def probe_loop(config: Config, stop: threading.Event) -> None:
 
                 sc = parse_config(config.sdm)
                 apply_sdm([run_mask_check(m) for m in sc.masking], [run_job_check(j) for j in sc.jobs])
+            if config.identity_activity:
+                from . import identity_activity as ia
+
+                ia_cfg = ia.parse_config(config.identity_activity)
+                if ia_cfg:
+                    apply_identity_activity(ia.run(ia_cfg), ia_cfg.window_seconds)
+            if config.restore_drills:
+                from . import restore_drills as rd
+
+                apply_restore_drills([rd.run(d) for d in rd.parse_config(config.restore_drills)])
             cycles.inc()
             elapsed = time.perf_counter() - started
             log.info("probe cycle done in %.2fs (%d target(s))", elapsed, len(config.targets))

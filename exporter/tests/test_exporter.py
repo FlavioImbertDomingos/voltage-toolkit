@@ -128,6 +128,7 @@ def test_scenarios(mock_server):
     mod._state["scenario"] = "keyserver-down"
     r = run_target(t)
     assert r.keyservers and not any(r.keyservers.values())
+    assert r.console_up is None  # no console_url configured -> no series
     mod._state["scenario"] = "policy-changed"
     r = run_target(t)
     assert "PHONE" in r.policy.format_names
@@ -874,3 +875,21 @@ def test_structured_event_and_json_logging(mock_server, capsys):
     assert obj["event"] == "probe" and obj["target"] == "siem" and obj["level"] == "INFO"
     assert obj["ts"].endswith("Z") and obj["message"].startswith("[siem]")
     configure_logging("INFO", "text")
+
+
+def test_console_probe_is_control_plane_only(mock_server):
+    """R16: the Management Console is a separate series; its outage must not touch tokenization."""
+    from prometheus_client import REGISTRY
+
+    _, https, mod = mock_server
+    t = target_for(mock_server, name="mc", console_url=f"{https}/console/")
+    r = run_target(t)
+    assert r.console_up is True and r.console_seconds is not None
+    mod._state["scenario"] = "console-down"
+    r = run_target(t)
+    assert r.console_up is False
+    assert r.policy_ok and all(x.ok for x in r.tokenize)  # protection unaffected
+    metrics.apply(r)
+    assert REGISTRY.get_sample_value("voltage_console_up", {"target": "mc"}) == 0.0
+    assert REGISTRY.get_sample_value("voltage_policy_up", {"target": "mc"}) == 1.0
+    mod._state["scenario"] = "healthy"
